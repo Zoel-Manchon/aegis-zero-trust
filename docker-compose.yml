@@ -1,0 +1,81 @@
+# =============================================================================
+# aegis — full stack: Postgres + Redis + Rust API + Caddy(web) + seed.
+# Single origin via Caddy: open http://localhost:8080
+#
+# PREREQS (see DOCKER.md):
+#   1) docker/db-init/01_schema.sql  — your `pg_dump --schema-only` output
+#   2) aegis-api/.sqlx    — `cargo sqlx prepare` (offline build cache)
+#
+#   docker compose up --build            # db, redis, api, web
+#   docker compose --profile seed up seed # one-shot: seed admin + victim
+# =============================================================================
+
+name: aegis
+
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: aegis
+      POSTGRES_DB: aegis
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./docker/db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegis -d aegis"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  api:
+    build:
+      context: ./aegis-api
+      dockerfile: Dockerfile
+    environment:
+      DATABASE_URL: postgres://aegis:aegis@db:5432/aegis
+      DB_SSL_MODE: disable          # internal network; flip to require/verify-full for real TLS
+      REDIS_URL: redis://redis:6379/
+      REFRESH_SECRET: change-me-in-production-at-least-32-characters
+      SERVER_ADDR: 0.0.0.0:3000
+      RUST_LOG: info
+    volumes:
+      - api-keys:/app/keys          # persisted JWT keypair (stable tokens across restarts)
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/web.Dockerfile
+    ports:
+      - "8080:80"
+    depends_on:
+      - api
+
+  seed:
+    image: postgres:17-alpine
+    profiles: ["seed"]
+    environment:
+      PGPASSWORD: aegis
+    entrypoint: ["/bin/sh", "/seed/seed.sh"]
+    volumes:
+      - ./docker/seed:/seed:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  db-data:
+  api-keys:

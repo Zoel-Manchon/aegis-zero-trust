@@ -1,0 +1,66 @@
+# =============================================================================
+# Vault overlay — dynamic, short-lived Postgres credentials for the API.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.vault.yml up -d --build
+#
+# Adds a dev-mode Vault, a one-shot init that configures the database secrets
+# engine, and points the API at Vault. The API's entrypoint fetches leased DB
+# creds on boot (see aegis-api/docker-entrypoint.sh). Base stack is unchanged
+# when this file is not included.
+# =============================================================================
+name: aegis
+
+services:
+  vault:
+    image: hashicorp/vault:1.17
+    container_name: aegis-vault
+    cap_add:
+      - IPC_LOCK
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: root
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      VAULT_ADDR: http://127.0.0.1:8200
+    command: ["server", "-dev"]
+    ports:
+      - "8200:8200"          # Vault UI/API at http://localhost:8200 (token: root)
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  vault-init:
+    image: hashicorp/vault:1.17
+    depends_on:
+      vault:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: root
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: aegis
+      DB_ADMIN_USER: aegis
+      DB_ADMIN_PASSWORD: aegis
+    entrypoint: ["/bin/sh", "/vault/init.sh"]
+    volumes:
+      - ./vault:/vault:ro
+    restart: "no"
+
+  api:
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: root
+      VAULT_DB_ROLE: aegis-api
+      DB_HOST: db
+      DB_PORT: "5432"
+      DB_NAME: aegis

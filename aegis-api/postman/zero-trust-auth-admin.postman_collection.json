@@ -1,0 +1,626 @@
+{
+    "info": {
+        "name": "Zero Trust Auth Admin Workflow",
+        "_postman_id": "9d9c1e9f-zt-admin-workflow",
+        "description": "Functional + admin/security dashboard workflow for Axum Zero Trust Auth System",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "00 - Health / Notes",
+            "item": [
+                {
+                    "name": "Base URL Check - Admin Dashboard Without Token",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/admin/dashboard",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "admin",
+                                "dashboard"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "01 - Auth Setup",
+            "item": [
+                {
+                    "name": "Register Normal User",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{password}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/register",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "register"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Register Admin User",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{password}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/register",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "register"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Login Normal User",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const json = pm.response.json();",
+                                    "if (json.data?.access_token) {",
+                                    "  pm.environment.set('user_access_token', json.data.access_token);",
+                                    "  pm.environment.set('access_token', json.data.access_token);",
+                                    "  pm.environment.set('refresh_token', json.data.refresh_token);",
+                                    "  pm.environment.set('jti', json.data.jti);",
+                                    "}",
+                                    "if (json.data?.mfa_token) {",
+                                    "  pm.environment.set('mfa_token', json.data.mfa_token);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"{{password}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "login"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Login Admin User",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const json = pm.response.json();",
+                                    "if (json.data?.access_token) {",
+                                    "  pm.environment.set('admin_access_token', json.data.access_token);",
+                                    "  pm.environment.set('access_token', json.data.access_token);",
+                                    "  pm.environment.set('refresh_token', json.data.refresh_token);",
+                                    "  pm.environment.set('jti', json.data.jti);",
+                                    "}",
+                                    "if (json.data?.mfa_token) {",
+                                    "  pm.environment.set('mfa_token', json.data.mfa_token);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"{{admin_email}}\",\n  \"password\": \"{{password}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "login"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "02 - MFA Workflow",
+            "item": [
+                {
+                    "name": "MFA Setup",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const json = pm.response.json();",
+                                    "if (json.data?.secret) pm.environment.set('mfa_secret', json.data.secret);",
+                                    "if (json.data?.otpauth_url) pm.environment.set('mfa_otpauth_url', json.data.otpauth_url);"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/mfa/setup",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "mfa",
+                                "setup"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "MFA Verify Setup",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"code\": \"{{mfa_code}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/mfa/verify-setup",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "mfa",
+                                "verify-setup"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "MFA Complete Login",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const json = pm.response.json();",
+                                    "if (json.data?.access_token) {",
+                                    "  pm.environment.set('access_token', json.data.access_token);",
+                                    "  pm.environment.set('refresh_token', json.data.refresh_token);",
+                                    "  pm.environment.set('jti', json.data.jti);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"mfa_token\": \"{{mfa_token}}\",\n  \"code\": \"{{mfa_code}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/mfa/complete-login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "mfa",
+                                "complete-login"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "MFA Disable",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}"
+                            },
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"code\": \"{{mfa_code}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/mfa/disable",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "mfa",
+                                "disable"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "03 - Sessions / Refresh",
+            "item": [
+                {
+                    "name": "Refresh Token",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "type": "text/javascript",
+                                "exec": [
+                                    "const json = pm.response.json();",
+                                    "if (json.access_token) pm.environment.set('access_token', json.access_token);",
+                                    "if (json.refresh_token) pm.environment.set('refresh_token', json.refresh_token);",
+                                    "if (json.data?.access_token) {",
+                                    "  pm.environment.set('access_token', json.data.access_token);",
+                                    "  pm.environment.set('refresh_token', json.data.refresh_token);",
+                                    "  if (json.data.jti) pm.environment.set('jti', json.data.jti);",
+                                    "}"
+                                ]
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\",\n  \"jti\": \"{{jti}}\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/refresh",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "refresh"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Logout",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/logout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "logout"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Logout All",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{access_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/logout-all",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "logout-all"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "04 - Admin Security Dashboard",
+            "item": [
+                {
+                    "name": "Admin Dashboard",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_access_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/admin/dashboard",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "admin",
+                                "dashboard"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Security Events",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_access_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/admin/security/events?limit=20",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "admin",
+                                "security",
+                                "events"
+                            ],
+                            "query": [
+                                {
+                                    "key": "limit",
+                                    "value": "20"
+                                }
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Security Metrics",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_access_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/admin/security/metrics",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "admin",
+                                "security",
+                                "metrics"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Security Alerts",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{admin_access_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/admin/security/alerts",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "admin",
+                                "security",
+                                "alerts"
+                            ]
+                        }
+                    }
+                }
+            ]
+        },
+        {
+            "name": "05 - Attack / Negative Tests",
+            "item": [
+                {
+                    "name": "Normal User Cannot Access Admin Dashboard",
+                    "request": {
+                        "method": "GET",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{user_access_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/admin/dashboard",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "admin",
+                                "dashboard"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Missing Token - Logout",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "{{base_url}}/logout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "logout"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Wrong Login Password",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"email\": \"{{user_email}}\",\n  \"password\": \"wrong-password\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "login"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Wrong MFA Code",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n  \"mfa_token\": \"{{mfa_token}}\",\n  \"code\": \"000000\"\n}"
+                        },
+                        "url": {
+                            "raw": "{{base_url}}/mfa/complete-login",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "mfa",
+                                "complete-login"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "Use MFA Token As Access Token",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Authorization",
+                                "value": "Bearer {{mfa_token}}"
+                            }
+                        ],
+                        "url": {
+                            "raw": "{{base_url}}/logout",
+                            "host": [
+                                "{{base_url}}"
+                            ],
+                            "path": [
+                                "logout"
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+    ]
+}

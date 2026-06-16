@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Aegis SOC shield">
+  <defs>
+    <clipPath id="shield">
+      <path d="M32 3 L57 12 V31 C57 47 46 57 32 61 C18 57 7 47 7 31 V12 Z"/>
+    </clipPath>
+    <linearGradient id="red" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff5b5b"/><stop offset="1" stop-color="#cf1d1d"/>
+    </linearGradient>
+    <linearGradient id="blue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5b8cff"/><stop offset="1" stop-color="#1c3fd0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- shield body: left = red team, right = blue team (the SOC duality) -->
+  <g clip-path="url(#shield)">
+    <rect x="0" y="0" width="32" height="64" fill="url(#red)"/>
+    <rect x="32" y="0" width="32" height="64" fill="url(#blue)"/>
+    <rect x="31" y="0" width="2" height="64" fill="#0a0e13" opacity="0.30"/>
+    <rect x="0" y="0" width="64" height="18" fill="#ffffff" opacity="0.12"/>
+  </g>
+
+  <!-- shield outline -->
+  <path d="M32 3 L57 12 V31 C57 47 46 57 32 61 C18 57 7 47 7 31 V12 Z"
+        fill="none" stroke="#08c971" stroke-width="2.5" stroke-linejoin="round"/>
+
+  <!-- keyhole: identity / zero-trust auth -->
+  <g>
+    <circle cx="32" cy="26" r="7" fill="#f3f8ff"/>
+    <path d="M29 30 H35 L36.5 46 H27.5 Z" fill="#f3f8ff"/>
+    <circle cx="32" cy="26" r="7" fill="none" stroke="#0a0e13" stroke-width="1.4" opacity="0.8"/>
+    <path d="M29 30 H35 L36.5 46 H27.5 Z" fill="none" stroke="#0a0e13" stroke-width="1.4" stroke-linejoin="round" opacity="0.8"/>
+  </g>
+</svg>

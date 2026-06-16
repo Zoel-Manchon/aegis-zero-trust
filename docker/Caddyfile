@@ -1,0 +1,31 @@
+# Single-origin entrypoint: serve the console statically and proxy /api → API.
+# The frontend calls /api/* (VITE_API_BASE defaults to /api); we strip the
+# prefix so the backend sees bare paths (it has no /api prefix). SSE and WS
+# upgrade through reverse_proxy automatically.
+:80 {
+    encode zstd gzip
+
+    handle /api/* {
+        uri strip_prefix /api
+        reverse_proxy api:3000
+    }
+
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
+    }
+}
+
+# --- HTTPS single-origin (reference parity) -------------------------------
+# To serve over TLS on https://localhost with Caddy's internal CA, replace the
+# block above with:
+#
+# https://localhost {
+#     encode zstd gzip
+#     tls internal
+#     handle /api/* { uri strip_prefix /api; reverse_proxy api:3000 }
+#     handle { root * /srv; try_files {path} /index.html; file_server }
+# }
+#
+# Then trust Caddy's local CA once:  docker compose exec web caddy trust

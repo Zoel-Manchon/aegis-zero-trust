@@ -1,0 +1,8 @@
+/target
+.env
+private_key.pem
+public_key.pem
+# local DB dumps / backups (never commit)
+*.backup
+test_dump.sql
+*.sql.bak

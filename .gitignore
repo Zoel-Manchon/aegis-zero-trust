@@ -1,0 +1,30 @@
+# ---- Rust ----
+aegis-api/target/
+
+# ---- Node / Vite ----
+aegis-console/node_modules/
+aegis-console/dist/
+*.log
+
+# ---- Secrets (NEVER commit) ----
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
+**/*.key
+aegis-api/keys/
+
+# ---- OS / editor ----
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# ---- Local DB dumps / backups ----
+*.backup
+*.sql.bak
+test_dump.sql
+
+# NOTE: intentionally NOT ignored (must be committed for a turnkey clone):
+#   aegis-api/.sqlx/        — sqlx offline build cache
+#   docker/db-init/01_schema.sql       — database schema

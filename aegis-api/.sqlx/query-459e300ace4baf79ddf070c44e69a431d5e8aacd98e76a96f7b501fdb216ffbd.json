@@ -1,0 +1,56 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            COALESCE(COUNT(*), 0)::bigint\n                AS \"total_events!\",\n\n            COALESCE(\n                COUNT(*) FILTER (\n                    WHERE severity = 'CRITICAL'\n                ),\n                0\n            )::bigint\n                AS \"critical_events!\",\n\n            COALESCE(\n                COUNT(*) FILTER (\n                    WHERE severity = 'HIGH'\n                ),\n                0\n            )::bigint\n                AS \"high_events!\",\n\n            COALESCE(\n                COUNT(*) FILTER (\n                    WHERE event_type = 'REFRESH_REPLAY_DETECTED'\n                ),\n                0\n            )::bigint\n                AS \"refresh_replays!\",\n\n            COALESCE(\n                COUNT(*) FILTER (\n                    WHERE event_type = 'POLICY_DENIED'\n                ),\n                0\n            )::bigint\n                AS \"policy_denials!\",\n\n            COALESCE(\n                COUNT(*) FILTER (\n                    WHERE event_type = 'MFA_FAILURE'\n                ),\n                0\n            )::bigint\n                AS \"mfa_failures!\",\n\n            COALESCE(\n                COUNT(*) FILTER (\n                    WHERE event_type = 'BRUTE_FORCE_LOCKOUT'\n                ),\n                0\n            )::bigint\n                AS \"brute_force_lockouts!\"\n\n        FROM security_events\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "total_events!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "critical_events!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "high_events!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "refresh_replays!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "policy_denials!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "mfa_failures!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 6,
+        "name": "brute_force_lockouts!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "459e300ace4baf79ddf070c44e69a431d5e8aacd98e76a96f7b501fdb216ffbd"
+}

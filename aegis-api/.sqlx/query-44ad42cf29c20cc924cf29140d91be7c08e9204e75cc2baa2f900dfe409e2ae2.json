@@ -1,0 +1,50 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n            COUNT(*) FILTER (\n                WHERE severity = 'CRITICAL'\n                  AND created_at > now() - interval '24 hours'\n            )::bigint AS \"critical_events!\",\n\n            COUNT(*) FILTER (\n                WHERE event_type = 'POLICY_DENIED'\n                  AND created_at > now() - interval '10 minutes'\n            )::bigint AS \"policy_denials_10m!\",\n\n            COUNT(*) FILTER (\n                WHERE event_type = 'MFA_FAILURE'\n                  AND created_at > now() - interval '10 minutes'\n            )::bigint AS \"mfa_failures_10m!\",\n\n            COUNT(*) FILTER (\n                WHERE event_type = 'BRUTE_FORCE_LOCKOUT'\n                  AND created_at > now() - interval '10 minutes'\n            )::bigint AS \"brute_force_lockouts_10m!\",\n\n            COUNT(*) FILTER (\n                WHERE event_type = 'REFRESH_REPLAY_DETECTED'\n                  AND created_at > now() - interval '24 hours'\n            )::bigint AS \"refresh_replays_24h!\",\n\n            COUNT(*) FILTER (\n                WHERE (metadata->'impossible_travel'->>'detected')::boolean IS TRUE\n                  AND created_at > now() - interval '24 hours'\n            )::bigint AS \"impossible_travel_24h!\"\n        FROM security_events\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "critical_events!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 1,
+        "name": "policy_denials_10m!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 2,
+        "name": "mfa_failures_10m!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 3,
+        "name": "brute_force_lockouts_10m!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 4,
+        "name": "refresh_replays_24h!",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "impossible_travel_24h!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": []
+    },
+    "nullable": [
+      null,
+      null,
+      null,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "44ad42cf29c20cc924cf29140d91be7c08e9204e75cc2baa2f900dfe409e2ae2"
+}
