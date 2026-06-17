@@ -1,8 +1,8 @@
-/* Passkeys / WebAuthn. The backend WebAuthn verification is still stubbed, so
- * list + delete are fully functional while register/login are experimental. */
+/* Passkeys / WebAuthn API client. Verification is performed server-side by
+ * webauthn-rs; the browser ceremonies live in lib/auth/webauthn.ts. */
 
 import { api } from "@/lib/api/client";
-import type { PasskeyChallenge, PasskeyCredentialView } from "@/types";
+import type { LoginResponse, PasskeyChallenge, PasskeyCredentialView } from "@/types";
 
 interface ListResponse {
     passkeys: PasskeyCredentialView[];
@@ -24,5 +24,5 @@ export const passkeysApi = {
         api.post<PasskeyChallenge>("/passkeys/login/begin", { email }, { auth: false }),
 
     loginFinish: (body: Record<string, unknown>) =>
-        api.post<unknown>("/passkeys/login/finish", body, { auth: false }),
+        api.post<LoginResponse>("/passkeys/login/finish", body, { auth: false }),
 };

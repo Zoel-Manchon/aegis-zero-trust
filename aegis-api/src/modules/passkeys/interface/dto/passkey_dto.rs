@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use validator::Validate;
+use webauthn_rs::prelude::{PublicKeyCredential, RegisterPublicKeyCredential};
 
 #[derive(Debug, Deserialize, Validate)]
 pub struct BeginPasskeyRegistrationRequest {
@@ -11,14 +12,11 @@ pub struct BeginPasskeyRegistrationRequest {
 pub struct FinishPasskeyRegistrationRequest {
     #[validate(length(min = 16))]
     pub challenge_id: String,
-    #[validate(length(min = 8))]
-    pub credential_id: String,
-    #[validate(length(min = 8))]
-    pub client_data_json_b64: String,
-    #[validate(length(min = 8))]
-    pub attestation_object_b64: String,
-    pub transports: Option<Vec<String>>,
+    /// The raw WebAuthn attestation credential produced by `navigator.credentials.create()`.
+    pub credential: RegisterPublicKeyCredential,
+    #[validate(length(min = 1, max = 80))]
     pub friendly_name: Option<String>,
+    pub transports: Option<Vec<String>>,
 }
 
 #[derive(Debug, Deserialize, Validate)]
@@ -31,15 +29,8 @@ pub struct BeginPasskeyLoginRequest {
 pub struct FinishPasskeyLoginRequest {
     #[validate(length(min = 16))]
     pub challenge_id: String,
-    #[validate(length(min = 8))]
-    pub credential_id: String,
-    #[validate(length(min = 8))]
-    pub client_data_json_b64: String,
-    #[validate(length(min = 8))]
-    pub authenticator_data_b64: String,
-    #[validate(length(min = 8))]
-    pub signature_b64: String,
-    pub user_handle_b64: Option<String>,
+    /// The raw WebAuthn assertion credential produced by `navigator.credentials.get()`.
+    pub credential: PublicKeyCredential,
 }
 
 #[derive(Debug, Deserialize, Validate)]

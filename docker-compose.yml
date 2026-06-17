@@ -42,6 +42,9 @@ services:
       dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgres://aegis:aegis@db:5432/aegis
+      WEBAUTHN_RP_ID: localhost
+      WEBAUTHN_RP_ORIGIN: http://localhost:8080
+      WEBAUTHN_RP_NAME: Aegis
       DB_SSL_MODE: disable          # internal network; flip to require/verify-full for real TLS
       REDIS_URL: redis://redis:6379/
       REFRESH_SECRET: change-me-in-production-at-least-32-characters

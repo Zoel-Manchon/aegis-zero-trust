@@ -33,6 +33,7 @@ import {
 import { setAccessTokenProvider, setRefreshHandler } from "@/lib/api/client";
 import { authApi } from "@/lib/api/auth";
 import { jtiFromToken } from "@/lib/auth/jwt";
+import { assertPasskey } from "@/lib/auth/webauthn";
 import type { LoginResponse, MeResponse, UserRole } from "@/types";
 
 const REFRESH_TOKEN_KEY = "zt.rt";
@@ -49,6 +50,7 @@ interface AuthContextValue extends AuthState {
     /** True once /me has been attempted at least once for the current session. */
     roleResolved: boolean;
     login: (email: string, password: string) => Promise<LoginResponse>;
+    loginWithPasskey: (email: string) => Promise<LoginResponse>;
     completeMfa: (mfaToken: string, code: string) => Promise<LoginResponse>;
     logout: () => Promise<void>;
     logoutEverywhere: () => Promise<void>;
@@ -153,6 +155,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         [applyLoginSuccess],
     );
 
+    const loginWithPasskey = useCallback(
+        async (email: string) => {
+            const res = await assertPasskey(email.trim());
+            applyLoginSuccess(res);
+            return res;
+        },
+        [applyLoginSuccess],
+    );
+
     const completeMfa = useCallback(
         async (mfaToken: string, code: string) => {
             const res = await authApi.completeMfa({ mfa_token: mfaToken, code });
@@ -215,13 +226,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             role: user?.role ?? null,
             roleResolved,
             login,
+            loginWithPasskey,
             completeMfa,
             logout,
             logoutEverywhere,
             refresh,
             refreshUser,
         }),
-        [state, user, roleResolved, login, completeMfa, logout, logoutEverywhere, refresh, refreshUser],
+        [state, user, roleResolved, login, loginWithPasskey, completeMfa, logout, logoutEverywhere, refresh, refreshUser],
     );
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

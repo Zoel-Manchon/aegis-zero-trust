@@ -27,7 +27,7 @@ sqlx = { version = "0.8.6", features = [
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1.44"
 tracing-subscriber = "0.3.23"
-uuid = { version = "1", features = ["serde", "v4"] }
+uuid = { version = "1", features = ["serde", "v4", "v5"] }
 validator = { version = "0.20.0", features = ["derive"] }   
 hex = "0.4"
 hmac = "0.13.0"
@@ -41,8 +41,8 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "rus
 async-stream = "0.3"
 futures-core = "0.3"
 tower-http = { version = "0.6", features = ["cors", "limit", "timeout", "set-header"] }
+webauthn-rs = { version = "0.5", features = ["danger-allow-state-serialisation"] }
 [dev-dependencies]
 tower = "0.5"
 http-body-util = "0.1"
 bytes = "1"
-webauthn-rs = { version = "0.5", features = ["danger-allow-state-serialisation"] }

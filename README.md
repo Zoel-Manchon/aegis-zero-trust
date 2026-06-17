@@ -27,6 +27,10 @@ against the system to watch the defenses — and the detections — fire.
   rotation with replay detection** (a reused refresh token revokes the family).
 - **RBAC** (`user` / `admin`).
 - **TOTP MFA — mandatory for admins**: the SOC is gated behind enrollment.
+- **Passkeys (WebAuthn)** — passwordless, phishing-resistant login. Both the
+  registration and authentication ceremonies are verified server-side by
+  [`webauthn-rs`](https://crates.io/crates/webauthn-rs); only public keys are
+  stored, never a secret. See the [Passkeys](#passkeys-webauthn) section.
 
 **Zero-trust risk engine (per request)**
 - IP churn, device fingerprint, login velocity, session-family, and temporal
@@ -180,6 +184,51 @@ HTTPS on `https://localhost` with Caddy's built-in CA.
 
 ---
 
+## Passkeys (WebAuthn)
+
+Aegis supports passwordless login with **passkeys**. The device holds the private
+key in hardware (Touch ID, Windows Hello, a security key, or a phone); the server
+stores only the public credential. Every ceremony is verified server-side by
+`webauthn-rs` — the challenge, origin (phishing resistance), user verification,
+attestation/assertion signature, and the clone-detection counter are all checked.
+In-progress ceremony state lives in Redis between the begin/finish round-trips.
+Full details: [`PASSKEYS.md`](./PASSKEYS.md).
+
+Endpoints: `register/begin` + `register/finish` (enrol, while signed in) and
+`login/begin` + `login/finish` (sign in). The relying-party identity is set via
+`WEBAUTHN_RP_ID` / `WEBAUTHN_RP_ORIGIN` / `WEBAUTHN_RP_NAME` (defaults already match
+the local Caddy origin `http://localhost:8080`).
+
+### Try it locally
+
+A passkey only works on its registered origin, so use exactly
+**http://localhost:8080**. `localhost` counts as a secure context, so no HTTPS is
+needed for testing. If you don't have a fingerprint reader or hardware key, a
+**virtual authenticator** completes the exact same flow.
+
+**Chrome / Edge (simplest — built-in, no extension):**
+1. Open `http://localhost:8080` and sign in, then go to **Account**.
+2. Open DevTools (`F12`) → **⋮ → More tools → WebAuthn** → tick **Enable virtual
+   authenticator environment**.
+3. **Add** an authenticator: Protocol **ctap2**, Transport **internal**,
+   **Supports resident keys** ✓, **Supports user verification** ✓
+   (user verification is required — without it the server rejects the ceremony).
+4. Click **add passkey** — it completes instantly and appears in the Passkeys list.
+5. Sign out → **sign in with a passkey**, enter the same email, done.
+
+**Firefox (no built-in virtual authenticator — use an extension):**
+Firefox has no DevTools WebAuthn panel, so install the
+[**WebDevAuthn**](https://addons.mozilla.org/firefox/addon/webdevauthn/) extension
+(a virtual authenticator that intercepts the WebAuthn calls). Enable its injector
+on the `localhost:8080` tab, configure the virtual device with algorithm **ES256**
+and **user verification enabled**, then use **add passkey** / **sign in with a
+passkey** the same way.
+
+**Real authenticators** work too: a hardware key (touch it), a platform biometric
+(Touch ID / Windows Hello), or a phone passkey if the browser offers a QR option.
+
+---
+
 ## Repository layout
 
 ```
@@ -224,7 +273,7 @@ aegis/
 - [x] Attack Range (10 scenarios + run-all + storm) + storm-mode CLI simulator — see [`ATTACK_RANGE.md`](./ATTACK_RANGE.md)
 - [x] Docker Compose + Caddy single-origin delivery
 - [x] **HashiCorp Vault** — dynamic, short-lived Postgres credentials — see [`VAULT.md`](./VAULT.md)
-- [ ] WebAuthn / passkey verification (enrollment UI present; verification stubbed)
+- [x] **WebAuthn / passkeys** — full registration + login ceremonies, verified server-side by `webauthn-rs` — see [`PASSKEYS.md`](./PASSKEYS.md)
 
 ---
 

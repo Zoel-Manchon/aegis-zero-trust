@@ -54,8 +54,7 @@ pub async fn finish_passkey_registration_handler(
         &state,
         ctx.user_id,
         &req.challenge_id,
-        &req.credential_id,
-        &req.attestation_object_b64,
+        &req.credential,
         req.friendly_name.as_deref(),
         req.transports.as_deref().unwrap_or(&[]),
     ).await?;
@@ -95,7 +94,7 @@ pub async fn finish_passkey_login_handler(
     let result = passkey_service::finish_login(
         &state,
         &req.challenge_id,
-        &req.credential_id,
+        &req.credential,
         extract_user_agent_from_headers(&headers),
         addr.ip(),
     ).await?;

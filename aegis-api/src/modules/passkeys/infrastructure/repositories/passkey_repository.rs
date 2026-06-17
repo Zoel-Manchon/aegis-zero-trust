@@ -85,15 +85,17 @@ pub async fn update_successful_assertion(
     pool: &PgPool,
     credential_id: &str,
     new_sign_count: i64,
+    public_key_cose: &[u8],
 ) -> Result<(), AppError> {
     sqlx::query!(
         r#"
         UPDATE passkey_credentials
-        SET sign_count = $2, last_used_at = now()
+        SET sign_count = $2, public_key_cose = $3, last_used_at = now()
         WHERE credential_id = $1 AND revoked_at IS NULL
         "#,
         credential_id,
-        new_sign_count
+        new_sign_count,
+        public_key_cose
     )
     .execute(pool)
     .await?;

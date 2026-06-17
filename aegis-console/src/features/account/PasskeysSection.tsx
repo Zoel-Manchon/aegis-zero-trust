@@ -1,8 +1,9 @@
-/* Passkeys — list and revoke are fully wired. Enrollment is flagged
- * experimental because the backend WebAuthn verification is still stubbed. */
+/* Passkeys — list, revoke, and full WebAuthn enrollment. The browser ceremony
+ * runs through navigator.credentials and is verified server-side by webauthn-rs. */
 
 import { useCallback, useEffect, useState } from "react";
 import { passkeysApi } from "@/lib/api/passkeys";
+import { enrollPasskey, passkeysSupported } from "@/lib/auth/webauthn";
 import { Panel } from "@/components/Panel";
 import { Button } from "@/components/Button";
 import { Notice } from "@/components/Notice";
@@ -39,16 +40,30 @@ export function PasskeysSection() {
         }
     }
 
+    const [enrolling, setEnrolling] = useState(false);
+
     async function enroll() {
         setNote(null);
         setError(null);
+        if (!passkeysSupported()) {
+            setError("This browser doesn't support passkeys.");
+            return;
+        }
+        setEnrolling(true);
         try {
-            await passkeysApi.registerBegin("This device");
-            setNote(
-                "Enrollment challenge issued. Full WebAuthn enrollment is experimental — the backend verifier isn't wired yet.",
+            await enrollPasskey("This device");
+            setNote("Passkey registered.");
+            await load();
+        } catch (e) {
+            // A user cancelling the native prompt throws; keep it non-alarming.
+            const name = e instanceof Error ? e.name : "";
+            setError(
+                name === "NotAllowedError"
+                    ? "Enrollment cancelled."
+                    : "Couldn't register that passkey.",
             );
-        } catch {
-            setError("Couldn't begin enrollment.");
+        } finally {
+            setEnrolling(false);
         }
     }
 
@@ -88,8 +103,8 @@ export function PasskeysSection() {
                     </table>
                 )}
 
-                <Button type="button" variant="ghost" onClick={enroll}>
-                    add passkey (experimental)
+                <Button type="button" variant="ghost" onClick={enroll} disabled={enrolling}>
+                    {enrolling ? "waiting for device…" : "add passkey"}
                 </Button>
             </div>
         </Panel>
