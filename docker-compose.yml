@@ -2,12 +2,11 @@
 # aegis — full stack: Postgres + Redis + Rust API + Caddy(web) + seed.
 # Single origin via Caddy: open http://localhost:8080
 #
-# PREREQS (see DOCKER.md):
-#   1) docker/db-init/01_schema.sql  — your `pg_dump --schema-only` output
-#   2) aegis-api/.sqlx    — `cargo sqlx prepare` (offline build cache)
+#   docker compose up -d --build                  # db, redis, api, web
+#   docker compose --profile seed run --rm seed   # one-shot: admin + victim
 #
-#   docker compose up --build            # db, redis, api, web
-#   docker compose --profile seed up seed # one-shot: seed admin + victim
+# Everything needed for a cold clone is committed: docker/db-init/01_schema.sql
+# and aegis-api/.sqlx (see DOCKER.md).
 # =============================================================================
 
 name: aegis
@@ -27,6 +26,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 12
+    restart: unless-stopped
+    # Uncomment to reach Postgres from the host, e.g. to run `cargo sqlx prepare`
+    # after changing a query! macro. Port 5433 avoids clashing with a local
+    # Postgres already on 5432.
+    # ports:
+    #   - "5433:5432"
 
   redis:
     image: redis:7-alpine
@@ -35,6 +40,7 @@ services:
       interval: 5s
       timeout: 3s
       retries: 12
+    restart: unless-stopped
 
   api:
     build:
@@ -42,13 +48,14 @@ services:
       dockerfile: Dockerfile
     environment:
       DATABASE_URL: postgres://aegis:aegis@db:5432/aegis
-      WEBAUTHN_RP_ID: localhost
-      WEBAUTHN_RP_ORIGIN: http://localhost:8080
-      WEBAUTHN_RP_NAME: Aegis
       DB_SSL_MODE: disable          # internal network; flip to require/verify-full for real TLS
       REDIS_URL: redis://redis:6379/
       REFRESH_SECRET: change-me-in-production-at-least-32-characters
       SERVER_ADDR: 0.0.0.0:3000
+      BASE_URL: http://localhost:8080
+      WEBAUTHN_RP_ID: localhost
+      WEBAUTHN_RP_ORIGIN: http://localhost:8080
+      WEBAUTHN_RP_NAME: Aegis
       RUST_LOG: info
     volumes:
       - api-keys:/app/keys          # persisted JWT keypair (stable tokens across restarts)
@@ -57,6 +64,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    restart: unless-stopped
+    # Healthcheck is defined in aegis-api/Dockerfile.
 
   web:
     build:
@@ -65,18 +74,24 @@ services:
     ports:
       - "8080:80"
     depends_on:
-      - api
+      api:
+        condition: service_healthy   # don't serve a console that 502s on every call
+    restart: unless-stopped
 
   seed:
     image: postgres:17-alpine
     profiles: ["seed"]
     environment:
       PGPASSWORD: aegis
-    entrypoint: ["/bin/sh", "/seed/seed.sh"]
+    # Piped through sed so a CRLF checkout of seed.sh still runs (the file is
+    # bind-mounted, so .gitattributes is the real fix — this is the safety net).
+    entrypoint: ["/bin/sh", "-c", "sed 's/\\r$$//' /seed/seed.sh | /bin/sh"]
     volumes:
       - ./docker/seed:/seed:ro
     depends_on:
       db:
+        condition: service_healthy
+      api:
         condition: service_healthy
 
 volumes:

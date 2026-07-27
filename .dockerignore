@@ -1,0 +1,34 @@
+# Build context for the `web` service is the repo ROOT (see docker-compose.yml),
+# so this file — not aegis-console/.dockerignore — is the one Docker reads.
+# Without it, `docker build` uploads aegis-api/target/ (multi-GB) and the host
+# node_modules/ (platform-specific native binaries) into the image.
+
+.git
+.gitignore
+.gitattributes
+
+# Rust build output — never needed in an image
+**/target/
+
+# Node — always reinstalled inside the container for the right platform
+**/node_modules/
+**/dist/
+**/.vite/
+**/*.log
+
+# The API has its own context (./aegis-api) and its own .dockerignore
+aegis-api/
+
+# Secrets
+**/.env
+**/.env.*
+!**/.env.example
+**/*.pem
+**/*.key
+
+# Docs / media
+*.md
+docs/
+.vscode/
+.idea/
+.DS_Store

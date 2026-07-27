@@ -1,95 +1,152 @@
 # Running aegis with Docker
 
-One command brings up Postgres, Redis, the Rust API, and the console behind
-Caddy on a single origin. Two one-time prerequisites first.
+One command brings up Postgres, Redis, the Rust API and the console behind Caddy
+on a single origin.
 
-## Two generated files (committed in this repo)
-
-A fresh clone runs as-is because these are committed. You only regenerate them if
-you **change the schema** or the **`query!` macros**:
-
-**1. Schema — `docker/db-init/01_schema.sql`.** There's no auto-migrator; the DB
-container loads this on first boot. Regenerate from a working database:
-
-```bash
-PGPASSWORD=... pg_dump -h localhost -p 5432 -U <user> -d <db> \
-  --schema-only --no-owner --no-privileges > docker/db-init/01_schema.sql
-grep -c "CREATE TABLE" docker/db-init/01_schema.sql   # sanity: should be > 0
-```
-
-> ⚠️ **Match the Postgres major version.** `pg_dump` emits settings specific to
-> its server version (e.g. `transaction_timeout` exists only in PG 17+). The DB
-> container is pinned to **postgres:17** in `docker-compose.yml`; if your dump
-> comes from a different major version, change that tag to match.
-
-**2. sqlx offline cache — `aegis-api/.sqlx/`.** The API uses compile-time `sqlx`
-macros, so the image builds offline against this cache. Regenerate:
-
-```bash
-cd aegis-api
-# the CLI MUST be built with the postgres driver, or you'll get "no driver found":
-cargo install sqlx-cli --force --no-default-features --features rustls,postgres
-# use the postgres:// scheme (NOT postgresql://):
-DATABASE_URL="postgres://<user>:<pass>@localhost:5432/<db>" cargo sqlx prepare
-```
+Requirements: **Docker Engine 24+ / Docker Desktop** (Compose v2 + BuildKit, both
+default). No local Rust or Node toolchain needed.
 
 ## Up
 
 ```bash
-docker compose up --build          # db + redis + api + web
+git clone https://github.com/Zoel-Manchon/aegis-zero-trust.git
+cd aegis-zero-trust
+
+docker compose up -d --build                   # db + redis + api + web
+docker compose --profile seed run --rm seed    # demo accounts
 ```
 
 Open **http://localhost:8080**.
 
-Seed the demo accounts (separate one-shot, after the stack is up):
-
-```bash
-docker compose --profile seed run --rm seed
-#   admin : admin@test.com  / AdminPass123!   (enroll MFA on first login)
-#   victim: victim@test.com / VictimPass123!
+```
+admin : admin@test.com  / AdminPass123!    (must enroll TOTP on first login)
+victim: victim@test.com / VictimPass123!
 ```
 
-## Use it
+The first build takes ~5-10 min (Rust release build). Later builds reuse the
+cargo cache mount and take seconds.
 
-1. Sign in as `admin@test.com` → you'll hit the **MFA gate** (mandatory for
-   admins) → enroll TOTP on the account page → sign in again.
-2. In the SOC, open **Attack Range**, pick an origin + scenario, target
-   `victim@test.com`, and launch. Launch again from a distant origin to trip
-   **IMPOSSIBLE_TRAVEL** — watch the live feed, map, and the WS popup + chime.
+```bash
+docker compose ps                     # health of every service
+docker compose logs -f api            # backend logs
+docker compose down                   # stop, keep data
+docker compose down -v                # stop and WIPE the database volume
+```
+
+## With Vault (dynamic DB credentials)
+
+The API can take **short-lived, per-instance Postgres credentials** from
+HashiCorp Vault instead of the static password:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.vault.yml up -d --build
+docker compose --profile seed run --rm seed
+# console -> http://localhost:8080     Vault UI -> http://localhost:8200 (token: root)
+```
+
+`vault-init` (`vault/init.sh`) enables the database secrets engine and defines
+the `aegis-api` role; the API entrypoint requests `database/creds/aegis-api` on
+boot and builds `DATABASE_URL` from the leased username/password. Inspect it:
+
+```bash
+docker compose exec vault sh -c 'VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=root vault read database/creds/aegis-api'
+docker compose exec db psql -U aegis -d aegis -c '\du' | grep v-token
+```
+
+Dev-mode Vault is in-memory with a known root token: a lab demonstration, not a
+production posture. Credentials are fetched once at container start (1h lease);
+a real deployment would renew the lease in-process.
+
+## Two generated files (already committed)
+
+A fresh clone runs as-is. Regenerate these only if you change the schema or a
+`query!` macro.
+
+**1. Schema - `docker/db-init/01_schema.sql`.** There is no auto-migrator; the DB
+container loads this on first boot.
+
+```bash
+PGPASSWORD=... pg_dump -h localhost -p 5432 -U <user> -d <db> \
+  --schema-only --no-owner --no-privileges > docker/db-init/01_schema.sql
+```
+
+> Match the Postgres major version. `pg_dump` emits version-specific settings
+> (`transaction_timeout` is PG 17+). The container is pinned to `postgres:17`.
+
+**2. sqlx offline cache - `aegis-api/.sqlx/`.** The API uses compile-time `query!`
+macros, so the image builds offline against this cache. **Any edit to the SQL
+text inside a `query!` macro invalidates its entry** and the build fails with
+`SQLX_OFFLINE=true but there is no cached data for this query`. Regenerate:
+
+```bash
+# expose the DB on the host first: uncomment the `ports:` block under `db`
+docker compose up -d db
+
+cd aegis-api
+cargo install sqlx-cli --force --no-default-features --features rustls,postgres
+DATABASE_URL="postgres://aegis:aegis@localhost:5433/aegis" cargo sqlx prepare
+```
+
+`cargo sqlx prepare` rewrites `.sqlx/` from scratch: it adds entries for new
+queries and deletes orphaned ones. Commit the result. Sanity check - the number
+of files must equal the number of macro call sites:
+
+```bash
+ls aegis-api/.sqlx/*.json | wc -l
+grep -rohE 'sqlx::query(_as|_scalar)?!' aegis-api/src | wc -l
+```
 
 ## How it's wired
 
-- **Single origin.** Caddy serves the console and proxies `/api/*` → `api:3000`
-  (stripping `/api`). SSE (events) and WS (alerts) upgrade through Caddy
-  automatically, and the backend sees the real client IP via `X-Forwarded-For`.
+- **Single origin.** Caddy serves the console and proxies `/api/*` -> `api:3000`
+  (stripping `/api`). SSE and WebSocket upgrade through automatically, and the
+  backend sees the real client IP via `X-Forwarded-For` (used by GeoIP).
 - **JWT keys** are generated on first API boot into the `api-keys` volume.
-- **DB TLS** is off on the internal network (`DB_SSL_MODE=disable`). For real
-  TLS, set it to `require`/`verify-full` and give Postgres a cert.
+- **Health gating.** `web` waits for `api` to report healthy, `api` waits for
+  Postgres and Redis, so a cold `up` never serves a console that 502s.
+- **Build context.** `web` builds from the repo root, so the root
+  `.dockerignore` is what keeps `target/` and `node_modules/` out of it.
+- **Line endings.** `.gitattributes` forces LF on everything executed inside a
+  container. A CRLF shebang makes the kernel look for `/bin/sh\r`.
 - **HTTPS:** see the commented `https://localhost { tls internal }` block in
-  `docker/Caddyfile` for single-origin TLS (reference parity).
+  `docker/Caddyfile`.
+
+## Extra binaries in the API image
+
+The image ships three binaries. `aegis` is the server (the entrypoint); the
+other two are red-team tools you can run against the live stack:
+
+```bash
+docker compose exec api attack_simulator                          # one-shot pentest battery, PASS/FAIL
+docker compose exec api attack_simulator storm --rps 20 --secs 15 # continuous multi-vector load
+docker compose exec -it api admin_terminal                        # interactive alert generator
+```
 
 ## Troubleshooting
 
-The DB only runs `docker/db-init/*.sql` on a **fresh** data volume. After any
-schema change, wipe and recreate: `docker compose down -v && docker compose up -d --build`.
+The DB only runs `docker/db-init/*.sql` on a **fresh** volume. After a schema
+change: `docker compose down -v && docker compose up -d --build`.
 
 | Symptom | Cause / fix |
 | --- | --- |
-| Build fails on a `query!` macro (`cargo build` exit 101) | `.sqlx` cache missing — run the `cargo sqlx prepare` step above. |
-| `cargo sqlx prepare`: *no driver found for URL scheme "postgres"* | sqlx-cli built without the Postgres driver — reinstall with `--features rustls,postgres --force`. |
-| `cargo sqlx prepare`: *no driver found for ... "postgresql"* | Use the `postgres://` scheme, not `postgresql://`. |
-| DB init: *unrecognized configuration parameter "transaction_timeout"* | Dump is from a newer Postgres than the container — match the `postgres:NN` tag (see version note above). |
-| Runtime / seed: *relation "users" (or other) does not exist* | `01_schema.sql` is missing/empty, so the DB initialized with no tables. Add it, then `docker compose down -v && up -d --build`. |
-| `seed` fails: *network ... not found* | Stale profiled container from a previous run. Use `docker compose --profile seed run --rm seed` (one-off), not `up seed`. |
-| Port 8080 already in use | Another stack (e.g. an old project) is bound to it — tear it down, or change `8080:80` under the `web` service. |
+| `exec /usr/local/bin/docker-entrypoint.sh: no such file or directory`, api restarts forever | CRLF from a Windows checkout. Fixed by `.gitattributes` plus the `sed` in the Dockerfile. If it persists: `git add --renormalize . && git commit && docker compose build --no-cache api`. |
+| Build sits on *transferring context* for GB, or dies with *no space left on device* | Root `.dockerignore` missing or not excluding `**/target/` and `**/node_modules/`. |
+| Web build fails on `@rollup/rollup-linux-x64-gnu` or `lightningcss` | Host `node_modules` leaked into the image. `web.Dockerfile` must copy only `src/`, `public/` and the configs, never the whole `aegis-console/`. |
+| `SQLX_OFFLINE=true but there is no cached data for this query` | The SQL text of that macro changed after the last `cargo sqlx prepare`. The cache is keyed by SHA-256 of the query string, so even a whitespace edit orphans the old entry. Regenerate as above. |
+| `cargo sqlx prepare`: *no driver found for URL scheme* | Reinstall sqlx-cli with `--features rustls,postgres --force`, and use the `postgres://` scheme, not `postgresql://`. |
+| DB init: *unrecognized configuration parameter "transaction_timeout"* | Dump is from a newer Postgres than the container - match the `postgres:NN` tag. |
+| Runtime/seed: *relation "users" does not exist* | `01_schema.sql` missing or empty -> `docker compose down -v && up -d --build`. |
+| `seed` fails: *network not found* | Use `docker compose --profile seed run --rm seed` (one-off), not `up seed`. |
+| Port 8080 in use | Change `8080:80` under the `web` service. |
+| `--mount=type=cache` parse error | BuildKit disabled. `DOCKER_BUILDKIT=1 docker compose build`, or delete the two `--mount` lines. |
 
-Verify the schema actually loaded before seeding:
-`docker compose exec db psql -U aegis -d aegis -c '\dt'` (should list `users`,
-`sessions`, `security_events`, …).
+Verify the schema loaded before seeding:
 
-## Notes
+```bash
+docker compose exec db psql -U aegis -d aegis -c '\dt'
+```
 
-- Change `REFRESH_SECRET` and the DB password in `docker-compose.yml` before
-  anything beyond local use.
-- The backend's correctness depends on `01_schema.sql` matching the columns the
-  code expects; it's committed so clones are reproducible.
+## Before anything beyond local use
+
+Rotate `REFRESH_SECRET` and the Postgres password in `docker-compose.yml`, and
+set `DB_SSL_MODE` to `require`/`verify-full` with a real certificate.

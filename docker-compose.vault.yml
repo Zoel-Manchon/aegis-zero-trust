@@ -44,7 +44,7 @@ services:
       DB_NAME: aegis
       DB_ADMIN_USER: aegis
       DB_ADMIN_PASSWORD: aegis
-    entrypoint: ["/bin/sh", "/vault/init.sh"]
+    entrypoint: ["/bin/sh", "-c", "sed 's/\\r$$//' /vault/init.sh | /bin/sh"]
     volumes:
       - ./vault:/vault:ro
     restart: "no"

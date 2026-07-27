@@ -1,0 +1,174 @@
+{
+  "info": {
+    "name": "Axum Auth Flow (Stable)",
+    "_postman_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Register",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"strongpassword123\"\n}"
+        },
+        "url": {
+          "raw": "http://127.0.0.1:3000/register",
+          "protocol": "http",
+          "host": ["127.0.0.1"],
+          "port": "3000",
+          "path": ["register"]
+        }
+      }
+    },
+
+    {
+      "name": "Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"test@example.com\",\n  \"password\": \"strongpassword123\"\n}"
+        },
+        "url": {
+          "raw": "http://127.0.0.1:3000/login",
+          "protocol": "http",
+          "host": ["127.0.0.1"],
+          "port": "3000",
+          "path": ["login"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "let res;",
+              "try { res = pm.response.json(); } catch (e) { console.log(pm.response.text()); return; }",
+              "",
+              "const data = res.data ?? res;",
+              "",
+              "if (!data.access_token) {",
+              "  console.log('Login failed:', res);",
+              "  return;",
+              "}",
+              "",
+              "pm.environment.set('access_token', data.access_token);",
+              "pm.environment.set('refresh_token', data.refresh_token);",
+              "pm.environment.set('jti', data.jti);"
+            ]
+          }
+        }
+      ]
+    },
+
+    {
+      "name": "Me (Protected)",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://127.0.0.1:3000/me",
+          "protocol": "http",
+          "host": ["127.0.0.1"],
+          "port": "3000",
+          "path": ["me"]
+        }
+      }
+    },
+
+    {
+      "name": "Refresh",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\",\n  \"jti\": \"{{jti}}\"\n}"
+        },
+        "url": {
+          "raw": "http://127.0.0.1:3000/refresh",
+          "protocol": "http",
+          "host": ["127.0.0.1"],
+          "port": "3000",
+          "path": ["refresh"]
+        },
+        "event": [
+          {
+            "listen": "test",
+            "script": {
+              "exec": [
+                "let res;",
+                "try { res = pm.response.json(); } catch (e) { console.log(pm.response.text()); return; }",
+                "",
+                "const data = res.data ?? res;",
+                "",
+                "if (!data.access_token) {",
+                "  console.log('Refresh failed:', res);",
+                "  return;",
+                "}",
+                "",
+                "pm.environment.set('access_token', data.access_token);",
+                "pm.environment.set('refresh_token', data.refresh_token);"
+              ]
+            }
+          }
+        ]
+      }
+    },
+
+    {
+      "name": "Logout",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://127.0.0.1:3000/logout",
+          "protocol": "http",
+          "host": ["127.0.0.1"],
+          "port": "3000",
+          "path": ["logout"]
+        }
+      }
+    },
+
+    {
+      "name": "Logout All",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{access_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://127.0.0.1:3000/logout_all",
+          "protocol": "http",
+          "host": ["127.0.0.1"],
+          "port": "3000",
+          "path": ["logout_all"]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+# Line endings.
+#
+# Everything that is executed *inside a Linux container* must be checked out
+# with LF, even on Windows. A CRLF shebang (`#!/bin/sh\r`) makes the kernel look
+# for an interpreter literally named "/bin/sh\r", which fails with:
+#     exec /usr/local/bin/docker-entrypoint.sh: no such file or directory
+#
+# After adding this file, run once:  git add --renormalize . && git commit
+
+* text=auto eol=lf
+
+*.sh            text eol=lf
+Dockerfile      text eol=lf
+*.Dockerfile    text eol=lf
+Caddyfile       text eol=lf
+*.yml           text eol=lf
+*.yaml          text eol=lf
+*.sql           text eol=lf
+*.rs            text eol=lf
+*.toml          text eol=lf
+*.ts            text eol=lf
+*.tsx           text eol=lf
+*.json          text eol=lf
+*.md            text eol=lf
+
+# Binary — never touch
+*.png           binary
+*.gif           binary
+*.mp4           binary
+*.svg           text eol=lf

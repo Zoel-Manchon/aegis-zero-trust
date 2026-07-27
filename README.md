@@ -161,7 +161,7 @@ docker compose --profile seed run --rm seed  # seed admin@test.com / victim@test
 ```
 
 Optionally run with **Vault**-issued dynamic, short-lived DB credentials instead
-of the static password (see [`VAULT.md`](./VAULT.md)):
+of the static password:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.vault.yml up -d --build
@@ -171,8 +171,9 @@ Then: sign in as **admin@test.com / AdminPass123!** → you'll hit the **MFA gat
 → enroll a TOTP app → sign in again → open **Attack Range**, target
 `victim@test.com`, and launch from two distant origins to trip impossible-travel.
 
-Full details, regenerating the schema/`.sqlx`, and the HTTPS option are in
-[`DOCKER.md`](./DOCKER.md).
+Full details, regenerating the schema/`.sqlx`, troubleshooting and the HTTPS
+option are in [`DOCKER.md`](./DOCKER.md). A step-by-step walkthrough of every
+feature — the one used to record the demo — is in [`DEMO.md`](./DEMO.md).
 
 ### Reverse proxy
 
@@ -192,7 +193,6 @@ stores only the public credential. Every ceremony is verified server-side by
 `webauthn-rs` — the challenge, origin (phishing resistance), user verification,
 attestation/assertion signature, and the clone-detection counter are all checked.
 In-progress ceremony state lives in Redis between the begin/finish round-trips.
-Full details: [`PASSKEYS.md`](./PASSKEYS.md).
 
 Endpoints: `register/begin` + `register/finish` (enrol, while signed in) and
 `login/begin` + `login/finish` (sign in). The relying-party identity is set via
@@ -244,9 +244,10 @@ aegis/
 ├─ docker-compose.yml
 ├─ docker-compose.vault.yml  # optional: Vault dynamic DB credentials
 ├─ vault/init.sh             # Vault database-engine config
-├─ DOCKER.md                 # full deployment runbook
-├─ VAULT.md                  # dynamic-credentials guide
-└─ ATTACK_RANGE.md           # scenario battery + run-all + storm
+├─ .dockerignore             # keeps target/ + node_modules/ out of the build context
+├─ .gitattributes            # LF for everything executed inside a container
+├─ DOCKER.md                 # build, run, Vault, troubleshooting
+└─ DEMO.md                   # feature walkthrough + attack-range reference
 ```
 
 ---
@@ -270,13 +271,13 @@ aegis/
 - [x] Per-request risk engine + GeoIP impossible-travel
 - [x] Mandatory TOTP MFA for admins
 - [x] Real-time SOC (SSE events + WS alert popups + sound) and geo map
-- [x] Attack Range (10 scenarios + run-all + storm) + storm-mode CLI simulator — see [`ATTACK_RANGE.md`](./ATTACK_RANGE.md)
+- [x] Attack Range (10 scenarios + run-all + storm) + storm-mode CLI simulator — see [`DEMO.md`](./DEMO.md)
 - [x] Docker Compose + Caddy single-origin delivery
-- [x] **HashiCorp Vault** — dynamic, short-lived Postgres credentials — see [`VAULT.md`](./VAULT.md)
-- [x] **WebAuthn / passkeys** — full registration + login ceremonies, verified server-side by `webauthn-rs` — see [`PASSKEYS.md`](./PASSKEYS.md)
+- [x] **HashiCorp Vault** — dynamic, short-lived Postgres credentials — see [`DOCKER.md`](./DOCKER.md#with-vault-dynamic-db-credentials)
+- [x] **WebAuthn / passkeys** — full registration + login ceremonies, verified server-side by `webauthn-rs`
 
 ---
 
 ## License
 
-MIT — see [`LICENSE`](./LICENSE). Replace if you prefer something else.
+MIT © 2026 Zoel Arias Manchón — see [`LICENSE`](./LICENSE).
