@@ -1,0 +1,333 @@
+{
+    "info": {
+        "name": "Zero Trust Auth System",
+        "_postman_id": "7d3f5f4c-6d90-4c55-9c11-zt-auth",
+        "description": "Functional collection for Axum Zero Trust Auth using Postman environment variables",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "Register",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/register",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "register"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Login",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                            "const json = pm.response.json();",
+                            "",
+                            "pm.test('Login response is valid JSON', function () {",
+                            "    pm.expect(json).to.have.property('data');",
+                            "});",
+                            "",
+                            "if (json.data?.access_token) {",
+                            "    pm.environment.set('access_token', json.data.access_token);",
+                            "    pm.environment.set('refresh_token', json.data.refresh_token);",
+                            "    pm.environment.set('jti', json.data.jti);",
+                            "}",
+                            "",
+                            "if (json.data?.mfa_token) {",
+                            "    pm.environment.set('mfa_token', json.data.mfa_token);",
+                            "}"
+                        ]
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/login",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "login"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Refresh",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                            "const json = pm.response.json();",
+                            "",
+                            "if (json.access_token && json.refresh_token) {",
+                            "    pm.environment.set('access_token', json.access_token);",
+                            "    pm.environment.set('refresh_token', json.refresh_token);",
+                            "}",
+                            "",
+                            "if (json.data?.access_token) {",
+                            "    pm.environment.set('access_token', json.data.access_token);",
+                            "    pm.environment.set('refresh_token', json.data.refresh_token);",
+                            "    if (json.data.jti) {",
+                            "        pm.environment.set('jti', json.data.jti);",
+                            "    }",
+                            "}",
+                            "",
+                            "pm.test('Refresh did not return an auth error', function () {",
+                            "    pm.expect(pm.response.code).to.be.oneOf([200]);",
+                            "});"
+                        ]
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"refresh_token\": \"{{refresh_token}}\",\n  \"jti\": \"{{jti}}\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/refresh",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "refresh"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Logout",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Authorization",
+                        "value": "Bearer {{access_token}}"
+                    }
+                ],
+                "url": {
+                    "raw": "{{base_url}}/logout",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "logout"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "Logout All",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Authorization",
+                        "value": "Bearer {{access_token}}"
+                    }
+                ],
+                "url": {
+                    "raw": "{{base_url}}/logout-all",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "logout-all"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "MFA Setup",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                            "const json = pm.response.json();",
+                            "",
+                            "if (json.data?.secret) {",
+                            "    pm.environment.set('mfa_secret', json.data.secret);",
+                            "}",
+                            "",
+                            "if (json.data?.otpauth_url) {",
+                            "    pm.environment.set('mfa_otpauth_url', json.data.otpauth_url);",
+                            "}",
+                            "",
+                            "pm.test('MFA setup returns secret and otpauth URL', function () {",
+                            "    pm.expect(json.data).to.have.property('secret');",
+                            "    pm.expect(json.data).to.have.property('otpauth_url');",
+                            "});"
+                        ]
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Authorization",
+                        "value": "Bearer {{access_token}}"
+                    }
+                ],
+                "url": {
+                    "raw": "{{base_url}}/mfa/setup",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "mfa",
+                        "setup"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "MFA Verify Setup",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Authorization",
+                        "value": "Bearer {{access_token}}"
+                    },
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"code\": \"{{mfa_code}}\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/mfa/verify-setup",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "mfa",
+                        "verify-setup"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "MFA Complete Login",
+            "event": [
+                {
+                    "listen": "test",
+                    "script": {
+                        "type": "text/javascript",
+                        "exec": [
+                            "const json = pm.response.json();",
+                            "",
+                            "if (json.data?.access_token) {",
+                            "    pm.environment.set('access_token', json.data.access_token);",
+                            "    pm.environment.set('refresh_token', json.data.refresh_token);",
+                            "    pm.environment.set('jti', json.data.jti);",
+                            "}",
+                            "",
+                            "pm.test('MFA complete-login response handled', function () {",
+                            "    pm.expect(pm.response.code).to.be.oneOf([200, 401, 403]);",
+                            "});"
+                        ]
+                    }
+                }
+            ],
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"mfa_token\": \"{{mfa_token}}\",\n  \"code\": \"{{mfa_code}}\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/mfa/complete-login",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "mfa",
+                        "complete-login"
+                    ]
+                }
+            }
+        },
+        {
+            "name": "MFA Disable",
+            "request": {
+                "method": "POST",
+                "header": [
+                    {
+                        "key": "Authorization",
+                        "value": "Bearer {{access_token}}"
+                    },
+                    {
+                        "key": "Content-Type",
+                        "value": "application/json"
+                    }
+                ],
+                "body": {
+                    "mode": "raw",
+                    "raw": "{\n  \"code\": \"{{mfa_code}}\"\n}"
+                },
+                "url": {
+                    "raw": "{{base_url}}/mfa/disable",
+                    "host": [
+                        "{{base_url}}"
+                    ],
+                    "path": [
+                        "mfa",
+                        "disable"
+                    ]
+                }
+            }
+        }
+    ]
+}

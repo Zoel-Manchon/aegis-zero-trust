@@ -1,0 +1,15 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        UPDATE passkey_credentials\n        SET revoked_at = now()\n        WHERE user_id = $1 AND credential_id = $2 AND revoked_at IS NULL\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Int8",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "312ab8fea74b5b9f3f2a7a2822c03c3cc24ccb17df6bd5bd7d3f0a7e0a3629c5"
+}
