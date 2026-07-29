@@ -9,11 +9,6 @@ against the system to watch the defenses — and the detections — fire.
 ![attack simulator demo](docs/attack_simulator.gif)
 
 
-![Rust](https://img.shields.io/badge/backend-Rust%20%2F%20axum-orange)
-![React](https://img.shields.io/badge/frontend-React%2019%20%2F%20Vite-blue)
-![Postgres](https://img.shields.io/badge/db-PostgreSQL%2017-336791)
-![Redis](https://img.shields.io/badge/cache-Redis-d82c20)
-![Docker](https://img.shields.io/badge/deploy-Docker%20Compose%20%2B%20Caddy-2496ed)
 
 > ⚠️ A learning / portfolio project. Hardened in many places, but review before
 > using any of it in production (and rotate every secret in the compose file).
