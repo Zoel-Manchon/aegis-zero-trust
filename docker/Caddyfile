@@ -2,30 +2,50 @@
 # The frontend calls /api/* (VITE_API_BASE defaults to /api); we strip the
 # prefix so the backend sees bare paths (it has no /api prefix). SSE and WS
 # upgrade through reverse_proxy automatically.
-:80 {
-    encode zstd gzip
+#
+# TLS is on by default. A zero-trust demo served over cleartext undermines its
+# own premise: secure cookies, WebAuthn and HSTS all assume a secure context,
+# and `localhost` being a *special* secure context in browsers hides bugs that
+# would appear the moment this ran anywhere else.
+#
+# `tls internal` mints a cert from Caddy's own CA. Trust it once with:
+#     docker compose exec web caddy trust
+# (or accept the browser warning — the demo works either way).
 
-    handle /api/* {
-        uri strip_prefix /api
-        reverse_proxy api:3000
-    }
-
-    handle {
-        root * /srv
-        try_files {path} /index.html
-        file_server
-    }
+{
+	# No public domain here, so no ACME. Silences the staging-CA noise on boot.
+	auto_https disable_redirects
 }
 
-# --- HTTPS single-origin (reference parity) -------------------------------
-# To serve over TLS on https://localhost with Caddy's internal CA, replace the
-# block above with:
-#
-# https://localhost {
-#     encode zstd gzip
-#     tls internal
-#     handle /api/* { uri strip_prefix /api; reverse_proxy api:3000 }
-#     handle { root * /srv; try_files {path} /index.html; file_server }
-# }
-#
-# Then trust Caddy's local CA once:  docker compose exec web caddy trust
+# --- HTTPS: the real entrypoint -------------------------------------------
+https://localhost {
+	encode zstd gzip
+	tls internal
+
+	# HSTS is deliberate: this is what the console would ship with in
+	# production, and leaving it out of the lab hides an entire class of
+	# downgrade problem.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	handle /api/* {
+		uri strip_prefix /api
+		reverse_proxy api:3000
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
+
+# --- HTTP: redirect only ---------------------------------------------------
+# Kept so an old http://localhost:8080 bookmark still lands somewhere useful
+# instead of hanging. Nothing is served in cleartext.
+http://localhost {
+	redir https://localhost{uri} permanent
+}

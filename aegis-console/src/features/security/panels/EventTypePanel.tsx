@@ -1,44 +1,40 @@
-import { Bar, BarChart, Cell, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Panel } from "@/components/Panel";
-import { axisTick, chart, tooltip } from "@/features/security/chartTheme";
 import type { EventTypeCount } from "@/features/security/derive";
 
-/* Horizontal breakdown of which event types are firing — populates as you run
- * attacks, so the scenarios (fingerprint spoof, session hijack, …) show up here
- * distinctly. Attack-indicating types are drawn in the warn colour. */
+/* Attack vectors — which event types are firing. Two columns of meters, hostile
+ * types in vermilion, benign in ink: the red rows are the ones to read. */
 export function EventTypePanel({ data }: { data: EventTypeCount[] }) {
+    const max = Math.max(1, ...data.map((d) => d.count));
     return (
-        <Panel title="attack vectors — event types" right="by volume">
+        <Panel title="Attack vectors" right="top event types by volume" bodyClassName="p-3">
             {data.length === 0 ? (
-                <p className="px-1 py-10 text-center text-[11px] text-fg-dim">
-                    No events yet. Launch an attack from the range above to populate this chart.
+                <p className="py-8 text-center text-[11px] text-fg-dim">
+                    No events yet. Launch a scenario from the attack range to populate this panel.
                 </p>
             ) : (
-                <ResponsiveContainer width="100%" height={Math.max(140, data.length * 30)}>
-                    <BarChart data={data} layout="vertical" margin={{ top: 4, right: 34, left: 4, bottom: 0 }}>
-                        <XAxis type="number" tick={axisTick} stroke={chart.grid} allowDecimals={false} />
-                        <YAxis
-                            type="category"
-                            dataKey="label"
-                            width={160}
-                            tick={{ fill: chart.fg, fontSize: 11 }}
-                            stroke={chart.grid}
-                        />
-                        <Tooltip {...tooltip} />
-                        <Bar dataKey="count" name="events" radius={[0, 2, 2, 0]} maxBarSize={18}>
-                            {data.map((d) => (
-                                <Cell key={d.type} fill={d.hostile ? chart.high : chart.accent} />
-                            ))}
-                            <LabelList
-                                dataKey="count"
-                                position="right"
-                                offset={8}
-                                fill={chart.fgDim}
-                                fontSize={11}
-                            />
-                        </Bar>
-                    </BarChart>
-                </ResponsiveContainer>
+                <div className="grid gap-x-6 md:grid-cols-2">
+                    {data.map((d) => (
+                        <div
+                            key={d.type}
+                            className="grid grid-cols-[minmax(0,210px)_1fr_44px] items-center gap-2.5 border-b border-neutral-200 py-1.5"
+                        >
+                            <span
+                                className={`truncate text-[11px] uppercase tracking-[0.06em] ${
+                                    d.hostile ? "text-accent-600" : "text-fg-dim"
+                                }`}
+                            >
+                                {d.label}
+                            </span>
+                            <span className="h-2.5 bg-neutral-200">
+                                <span
+                                    className={`block h-full ${d.hostile ? "bg-accent-600" : "bg-neutral-700"}`}
+                                    style={{ width: `${Math.round((d.count / max) * 100)}%` }}
+                                />
+                            </span>
+                            <span className="text-right text-[11px] text-fg-dim">{d.count}</span>
+                        </div>
+                    ))}
+                </div>
             )}
         </Panel>
     );

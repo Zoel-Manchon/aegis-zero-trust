@@ -1,9 +1,13 @@
-export function Notice({ kind, children }: { kind: "error" | "ok" | "info"; children: React.ReactNode }) {
+import type { ReactNode } from "react";
+
+/** Inline message. The accent rail on the left is the only ornament — it marks
+ *  the line as system output rather than page copy. */
+export function Notice({ kind, children }: { kind: "error" | "ok" | "info"; children: ReactNode }) {
     const cls =
         kind === "error"
-            ? "border-sev-critical/40 bg-sev-critical/10 text-sev-critical"
+            ? "border-accent bg-accent-100 text-accent-800"
             : kind === "ok"
-              ? "border-accent/40 bg-accent/10 text-accent"
-              : "border-line bg-panel-hi text-fg-dim";
-    return <div className={`border px-2 py-1.5 text-[11px] ${cls}`}>{children}</div>;
+              ? "border-neutral-800 bg-neutral-200 text-neutral-900"
+              : "border-neutral-500 bg-neutral-200 text-neutral-800";
+    return <div className={`border-l-[3px] px-2.5 py-2 text-[12px] ${cls}`}>{children}</div>;
 }

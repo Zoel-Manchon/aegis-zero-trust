@@ -20,14 +20,11 @@ function Center({ children }: { children: ReactNode }) {
 }
 
 function Card({ tone, title, body }: { tone: "high" | "dim"; title: string; body: ReactNode }) {
-    const border = tone === "high" ? "border-sev-high/40" : "border-line";
-    const text = tone === "high" ? "text-sev-high" : "text-fg-dim";
+    const text = tone === "high" ? "text-accent" : "text-fg-dim";
     return (
-        <div className={`w-full max-w-md border ${border} bg-panel`}>
-            <div className={`border-b border-line bg-panel-hi px-3 py-2 text-[10px] font-semibold uppercase tracking-[1.5px] ${text}`}>
-                {title}
-            </div>
-            <div className="space-y-2 p-4 text-[11px] text-fg-dim">{body}</div>
+        <div className="w-full max-w-md border border-line bg-panel">
+            <div className={`micro border-b-2 border-line px-3 py-2 ${text}`}>{title}</div>
+            <div className="space-y-2 p-4 text-[12px] leading-[1.6] text-fg-dim">{body}</div>
         </div>
     );
 }
@@ -43,7 +40,7 @@ export function RoleRoute({ require: required, children }: { require: UserRole; 
     }, [role, roleResolved, required, refreshUser]);
 
     if (!roleResolved || (role !== required && !refreshedOnce.current)) {
-        return <Center><span className="text-[11px] text-fg-dim">resolving role…</span></Center>;
+        return <Center><span className="text-[11px] uppercase tracking-[0.16em] text-fg-dim">resolving role…</span></Center>;
     }
 
     if (role === required) return <>{children}</>;
@@ -74,7 +71,7 @@ export function RoleRoute({ require: required, children }: { require: UserRole; 
                     <>
                         <p>This console requires the <span className="text-fg">{required}</span> role; your account is <span className="text-fg">{role}</span>.</p>
                         <p>If you changed <span className="text-fg">users.user_role</span> manually, run <span className="text-fg">UPDATE users SET user_role = 'admin' WHERE email = '...'</span>, then hard-refresh or sign in again.</p>
-                        <p><Link to="/account" className="text-accent hover:underline">Go to account</Link></p>
+                        <p><Link to="/account" className="text-accent-700 hover:underline">Go to account</Link></p>
                     </>
                 }
             />

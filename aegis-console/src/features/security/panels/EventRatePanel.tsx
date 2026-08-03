@@ -1,53 +1,44 @@
-import { Area, AreaChart, CartesianGrid, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Panel } from "@/components/Panel";
-import { axisTick, chart, tooltipLineCursor } from "@/features/security/chartTheme";
-import type { TimeBucket } from "@/features/security/derive";
+import { RATE_BUCKETS, type TimeBucket } from "@/features/security/derive";
 
+const H = 140; // px of bar area, matching the 168px track minus padding
+
+/* Event rate. Deliberately not a smoothed area chart: each bar is one 30s
+ * interval, and the high/critical share is stacked on top in accent, so the
+ * question "is the hostile share growing?" is answered by the shape itself. */
 export function EventRatePanel({ data }: { data: TimeBucket[] }) {
+    const peak = Math.max(1, ...data.map((b) => b.count));
+
     return (
-        <Panel title="event rate — last 30 min" right="events/min">
-            <ResponsiveContainer width="100%" height={180}>
-                <AreaChart data={data} margin={{ top: 8, right: 8, left: -18, bottom: 0 }}>
-                    <defs>
-                        <linearGradient id="evrate" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor={chart.accent} stopOpacity={0.45} />
-                            <stop offset="100%" stopColor={chart.accent} stopOpacity={0} />
-                        </linearGradient>
-                    </defs>
-                    <CartesianGrid stroke={chart.grid} vertical={false} />
-                    <XAxis
-                        dataKey="t"
-                        tick={axisTick}
-                        stroke={chart.grid}
-                        tickFormatter={(value: number) => `-${29 - value}m`}
-                        interval={5}
-                    />
-                    <YAxis tick={axisTick} stroke={chart.grid} allowDecimals={false} width={38} />
-                    <Tooltip
-                        {...tooltipLineCursor}
-                        labelFormatter={(label) => {
-                            const n = Number(label);
-                            return Number.isFinite(n) ? `${29 - n} min ago` : "";
-                        }}
-                    />
-                    <Area
-                        type="monotone"
-                        dataKey="count"
-                        name="events"
-                        stroke={chart.accent}
-                        strokeWidth={2}
-                        fill="url(#evrate)"
-                    />
-                    <Line
-                        type="monotone"
-                        dataKey="crit"
-                        name="critical"
-                        stroke={chart.critical}
-                        strokeWidth={2}
-                        dot={false}
-                    />
-                </AreaChart>
-            </ResponsiveContainer>
+        <Panel
+            title="Event rate"
+            right={`last ${RATE_BUCKETS} intervals · peak ${peak}/int`}
+            bodyClassName=""
+        >
+            <div className="flex h-[168px] items-end gap-0.5 p-3">
+                {data.map((b) => {
+                    const crit = Math.round((b.crit / peak) * H);
+                    const rest = Math.round(((b.count - b.crit) / peak) * H);
+                    return (
+                        <div
+                            key={b.t}
+                            className="flex h-full flex-1 flex-col justify-end"
+                            title={`${b.count} events · ${b.crit} high/critical`}
+                        >
+                            <div className="bg-accent" style={{ height: crit }} />
+                            <div className="bg-neutral-400" style={{ height: rest }} />
+                        </div>
+                    );
+                })}
+            </div>
+            <div className="flex items-center justify-between border-t border-line px-3 py-1.5 text-[10px] uppercase tracking-[0.12em] text-fg-dim">
+                <span>−20 min</span>
+                <span className="flex gap-3.5">
+                    <span className="text-accent-700">■ high / critical</span>
+                    <span>■ all events</span>
+                </span>
+                <span>now</span>
+            </div>
         </Panel>
     );
 }

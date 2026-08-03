@@ -25,6 +25,8 @@ aegis-api/keys/
 *.sql.bak
 test_dump.sql
 
+
+caddy-root.crt
 # NOTE: intentionally NOT ignored (must be committed for a turnkey clone):
 #   aegis-api/.sqlx/        — sqlx offline build cache
 #   docker/db-init/01_schema.sql       — database schema

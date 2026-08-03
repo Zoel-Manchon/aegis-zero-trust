@@ -8,7 +8,10 @@ use crate::{
             infrastructure::repositories::user_repository::UserRepository,
             interface::middleware::{security_context::SecurityContext, extractor_helpers::extract_client_ip},
         },
-        mfa::{application::mfa_service, interface::dto::VerifyMfaRequest},
+        mfa::{
+            application::mfa_service::{self, SecondFactor},
+            interface::dto::VerifyMfaRequest,
+        },
     },
 };
 
@@ -31,8 +34,23 @@ pub struct MfaSetupResponse {
 pub struct CompleteMfaLoginRequest {
     pub mfa_token: String,
 
-    #[validate(length(min = 6, max = 6))]
+    /// A 6-digit TOTP code, or a backup code. Widened from exactly 6 so the
+    /// recovery path works when the authenticator is gone.
+    #[validate(length(min = 6, max = 32))]
     pub code: String,
+}
+
+/// Returned exactly once, when MFA is enabled or the codes are regenerated.
+/// Nothing else in the system can ever show these again — only their Argon2
+/// hashes are stored.
+#[derive(Serialize)]
+pub struct BackupCodesResponse {
+    pub backup_codes: Vec<String>,
+}
+
+#[derive(Serialize)]
+pub struct BackupCodesStatusResponse {
+    pub remaining: i64,
 }
 
 pub async fn setup_mfa_handler(
@@ -57,16 +75,18 @@ pub async fn setup_mfa_handler(
     })))
 }
 
+/// Confirm enrollment. Returns the freshly minted backup codes — the only time
+/// they are ever visible, so the response type changed from a bare message.
 pub async fn verify_setup_handler(
     State(state): State<AppState>,
     Extension(ctx): Extension<SecurityContext>,
     Json(req): Json<VerifyMfaRequest>,
-) -> Result<Json<ApiResponse<String>>, AppError> {
+) -> Result<Json<ApiResponse<BackupCodesResponse>>, AppError> {
     req.validate()?;
 
-    let valid = mfa_service::verify_setup(&state.pool, ctx.user_id, &req.code).await?;
+    let issued = mfa_service::verify_setup(&state.pool, ctx.user_id, &req.code).await?;
 
-    if !valid {
+    let Some(backup_codes) = issued else {
         security_audit::mfa_failure(
             &state.pool,
             &state.redis,
@@ -82,7 +102,7 @@ pub async fn verify_setup_handler(
         .await;
 
         return Err(AppError::Unauthorized);
-    }
+    };
 
     security_audit::mfa_success(
         &state.pool,
@@ -95,7 +115,65 @@ pub async fn verify_setup_handler(
     )
     .await;
 
-    Ok(Json(ApiResponse::success("MFA enabled".to_string())))
+    Ok(Json(ApiResponse::success(BackupCodesResponse { backup_codes })))
+}
+
+/// Mint a new set of backup codes, invalidating the old ones. Requires a valid
+/// second factor: otherwise a stolen session could quietly issue itself a
+/// permanent way back in.
+pub async fn regenerate_backup_codes_handler(
+    State(state): State<AppState>,
+    Extension(ctx): Extension<SecurityContext>,
+    Json(req): Json<VerifyMfaRequest>,
+) -> Result<Json<ApiResponse<BackupCodesResponse>>, AppError> {
+    req.validate()?;
+
+    if mfa_service::verify_second_factor(&state.pool, ctx.user_id, &req.code)
+        .await?
+        .is_none()
+    {
+        security_audit::mfa_failure(
+            &state.pool,
+            &state.redis,
+            Some(ctx.user_id),
+            Some(ctx.ip),
+            Some(ctx.user_agent),
+            Some(ctx.session_id),
+            Some(ctx.jti),
+            "mfa_backup_regenerate",
+            "invalid_code",
+            SecuritySeverity::High,
+        )
+        .await;
+
+        return Err(AppError::Unauthorized);
+    }
+
+    let backup_codes = mfa_service::regenerate_backup_codes(&state.pool, ctx.user_id).await?;
+
+    security_audit::mfa_success(
+        &state.pool,
+        ctx.user_id,
+        Some(ctx.ip),
+        Some(ctx.user_agent),
+        Some(ctx.session_id),
+        Some(ctx.jti),
+        "mfa_backup_codes_regenerated",
+    )
+    .await;
+
+    Ok(Json(ApiResponse::success(BackupCodesResponse { backup_codes })))
+}
+
+/// How many codes are left. Read-only and cheap, so the console can warn
+/// before the user runs out rather than after.
+pub async fn backup_codes_status_handler(
+    State(state): State<AppState>,
+    Extension(ctx): Extension<SecurityContext>,
+) -> Result<Json<ApiResponse<BackupCodesStatusResponse>>, AppError> {
+    let remaining = mfa_service::remaining_backup_codes(&state.pool, ctx.user_id).await?;
+
+    Ok(Json(ApiResponse::success(BackupCodesStatusResponse { remaining })))
 }
 
 pub async fn verify_mfa_handler(
@@ -167,9 +245,9 @@ security_audit::token_purpose_violation(
         }
     };
 
-    let valid = mfa_service::verify_code(&state.pool, claims.sub, &req.code).await?;
+    let factor = mfa_service::verify_second_factor(&state.pool, claims.sub, &req.code).await?;
 
-    if !valid {
+    let Some(factor) = factor else {
         security_audit::mfa_failure(
             &state.pool,
             &state.redis,
@@ -185,7 +263,7 @@ security_audit::token_purpose_violation(
         .await;
 
         return Err(AppError::Unauthorized);
-    }
+    };
 
     let user = UserRepository::find_by_id(&state.pool, claims.sub)
         .await?
@@ -208,6 +286,9 @@ security_audit::token_purpose_violation(
             jti,
             ..
         } => {
+            // A recovery-code login is recorded under its own action so it
+            // stands out in the SOC feed: it is legitimate, but it is also
+            // exactly what an attacker without the device would use.
             security_audit::mfa_success(
                 &state.pool,
                 user.id,
@@ -215,7 +296,10 @@ security_audit::token_purpose_violation(
                 Some(user_agent.clone()),
                 None,
                 Some(jti),
-                "mfa_complete_login",
+                match factor {
+                    SecondFactor::Totp => "mfa_complete_login",
+                    SecondFactor::BackupCode => "mfa_complete_login_backup_code",
+                },
             )
             .await;
 

@@ -1,11 +1,10 @@
-/* Passkeys — list, revoke, and full WebAuthn enrollment. The browser ceremony
- * runs through navigator.credentials and is verified server-side by webauthn-rs. */
+/* Passkeys — list, register, and revoke. The browser ceremony runs through
+ * navigator.credentials and is verified server-side by webauthn-rs. */
 
 import { useCallback, useEffect, useState } from "react";
 import { passkeysApi } from "@/lib/api/passkeys";
 import { enrollPasskey, passkeysSupported } from "@/lib/auth/webauthn";
 import { Panel } from "@/components/Panel";
-import { Button } from "@/components/Button";
 import { Notice } from "@/components/Notice";
 import type { PasskeyCredentialView } from "@/types";
 
@@ -14,6 +13,7 @@ export function PasskeysSection() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [note, setNote] = useState<string | null>(null);
+    const [enrolling, setEnrolling] = useState(false);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -40,8 +40,6 @@ export function PasskeysSection() {
         }
     }
 
-    const [enrolling, setEnrolling] = useState(false);
-
     async function enroll() {
         setNote(null);
         setError(null);
@@ -58,9 +56,7 @@ export function PasskeysSection() {
             // A user cancelling the native prompt throws; keep it non-alarming.
             const name = e instanceof Error ? e.name : "";
             setError(
-                name === "NotAllowedError"
-                    ? "Enrollment cancelled."
-                    : "Couldn't register that passkey.",
+                name === "NotAllowedError" ? "Enrollment cancelled." : "Couldn't register that passkey.",
             );
         } finally {
             setEnrolling(false);
@@ -68,45 +64,55 @@ export function PasskeysSection() {
     }
 
     return (
-        <Panel title="passkeys" right={`${items.length} registered`}>
-            <div className="space-y-3 p-1 text-[11px]">
-                {error && <Notice kind="error">{error}</Notice>}
-                {note && <Notice kind="info">{note}</Notice>}
+        <Panel
+            title="Passkeys"
+            right={
+                <button onClick={enroll} disabled={enrolling} className="btn btn-ghost micro">
+                    {enrolling ? "Waiting for device…" : "+ Register device"}
+                </button>
+            }
+            bodyClassName=""
+        >
+            {(error || note) && (
+                <div className="p-3 pb-0">
+                    {error && <Notice kind="error">{error}</Notice>}
+                    {note && <Notice kind="info">{note}</Notice>}
+                </div>
+            )}
 
-                {loading ? (
-                    <p className="text-fg-dim">loading…</p>
-                ) : items.length === 0 ? (
-                    <p className="text-fg-dim">No passkeys registered.</p>
-                ) : (
-                    <table className="w-full border-collapse">
-                        <tbody>
-                            {items.map((p) => (
-                                <tr key={p.credential_id} className="border-b border-grid">
-                                    <td className="py-1.5 pr-2 text-fg">{p.friendly_name ?? "passkey"}</td>
-                                    <td className="py-1.5 pr-2 text-fg-dim">
-                                        {p.transports.join(", ") || "—"}
-                                    </td>
-                                    <td className="py-1.5 pr-2 text-fg-dim">
-                                        {new Date(p.created_at).toISOString().slice(0, 10)}
-                                    </td>
-                                    <td className="py-1.5 text-right">
-                                        <button
-                                            onClick={() => remove(p.credential_id)}
-                                            className="text-[10px] uppercase text-sev-high hover:underline"
-                                        >
-                                            revoke
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                )}
-
-                <Button type="button" variant="ghost" onClick={enroll} disabled={enrolling}>
-                    {enrolling ? "waiting for device…" : "add passkey"}
-                </Button>
-            </div>
+            {loading ? (
+                <p className="p-3 text-[11px] text-fg-dim">Loading…</p>
+            ) : items.length === 0 ? (
+                <p className="p-3 text-[12px] leading-[1.6] text-fg-dim">
+                    No passkeys yet. Register this device to sign in without a password.
+                </p>
+            ) : (
+                <table className="table text-[12px]">
+                    <tbody>
+                        {items.map((p) => (
+                            <tr key={p.credential_id}>
+                                <td className="px-3 py-2 font-heading font-extrabold">
+                                    {p.friendly_name ?? "Passkey"}
+                                </td>
+                                <td className="px-2 py-2 text-fg-dim">
+                                    {p.transports.join(" · ") || "—"}
+                                </td>
+                                <td className="px-2 py-2 text-fg-dim">
+                                    added {new Date(p.created_at).toISOString().slice(0, 10)}
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                    <button
+                                        onClick={() => remove(p.credential_id)}
+                                        className="btn btn-ghost micro"
+                                    >
+                                        Remove
+                                    </button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
         </Panel>
     );
 }

@@ -1,18 +1,37 @@
 import { Panel } from "@/components/Panel";
 import type { ImpossibleTravelHit } from "@/features/security/derive";
 
+/* Impossible travel — the highest-signal detection in the system, so it gets
+ * its own panel, an accent title, and a tinted row for every hit. */
 export function ImpossibleTravelPanel({ hits }: { hits: ImpossibleTravelHit[] }) {
     return (
-        <Panel title="impossible travel" right={`${hits.length} hits`}>
-            <div className="min-h-[120px] space-y-1.5">
+        <Panel
+            title={<span className="text-accent-700">Impossible travel</span>}
+            right={`${hits.length} hits`}
+            bodyClassName=""
+        >
+            <div className="max-h-[148px] overflow-y-auto">
                 {hits.length === 0 ? (
-                    <div className="p-2.5 text-[11px] text-fg-dim">No impossible-travel violations in the current event window.</div>
-                ) : hits.map((h) => (
-                    <div key={h.id} className="border border-sev-critical/30 bg-sev-critical/5 px-2 py-1.5">
-                        <div className="text-[11px] font-bold text-sev-critical">user {h.user_id ?? "unknown"} · {Math.round(h.speed_kmh)} km/h</div>
-                        <div className="text-[10px] text-fg-dim">{h.from} → {h.to} · {Math.round(h.distance_km)} km · {h.ip}</div>
+                    <div className="p-3 text-[11px] text-fg-dim">
+                        No impossible-travel signals in window.
                     </div>
-                ))}
+                ) : (
+                    hits.map((h) => (
+                        <div
+                            key={h.id}
+                            className="border-b border-neutral-200 bg-accent-100 px-3 py-2"
+                        >
+                            <div className="font-heading text-[11px] font-extrabold tracking-[0.04em]">
+                                {h.from} → {h.to}
+                            </div>
+                            <div className="mt-0.5 text-[10px] uppercase tracking-[0.08em] text-fg-dim">
+                                uid {h.user_id ?? "—"} · {Math.round(h.distance_km).toLocaleString()} km ·{" "}
+                                {Math.round(h.speed_kmh).toLocaleString()} km/h ·{" "}
+                                {new Date(h.created_at).toISOString().slice(11, 19)}
+                            </div>
+                        </div>
+                    ))
+                )}
             </div>
         </Panel>
     );

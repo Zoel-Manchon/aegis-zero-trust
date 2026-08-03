@@ -1,5 +1,8 @@
 /* MFA enrollment & removal. Enrollment shows the TOTP secret + a scannable QR
- * built from the otpauth:// URI, then confirms with the first code. */
+ * built from the otpauth:// URI, then confirms with the first code.
+ *
+ * QR on the left at a fixed 150px, instructions and the code field on the right:
+ * the two halves of one task, side by side, so nobody scrolls mid-enrollment. */
 
 import { useEffect, useState, type FormEvent } from "react";
 import QRCode from "qrcode";
@@ -7,10 +10,15 @@ import { mfaApi } from "@/lib/api/mfa";
 import { ApiClientError } from "@/lib/api/client";
 import { useAuth } from "@/lib/auth/AuthContext";
 import { Panel } from "@/components/Panel";
-import { Field } from "@/components/Field";
 import { Button } from "@/components/Button";
 import { Notice } from "@/components/Notice";
 import type { MfaSetupResponse } from "@/types";
+
+/** Group the base32 secret in fours — it's transcribed by hand often enough
+ *  that the grouping earns its place. */
+function grouped(secret: string): string {
+    return secret.replace(/(.{4})/g, "$1 ").trim();
+}
 
 export function MfaSection() {
     const { user, refreshUser } = useAuth();
@@ -30,8 +38,8 @@ export function MfaSection() {
         QRCode.toString(setup.otpauth_url, {
             type: "svg",
             margin: 1,
-            width: 180,
-            color: { dark: "#c9d4e0", light: "#00000000" },
+            width: 150,
+            color: { dark: "#201e1d", light: "#00000000" },
         })
             .then((svg) => alive && setQrSvg(svg))
             .catch(() => alive && setQrSvg(""));
@@ -90,58 +98,94 @@ export function MfaSection() {
     const enabled = user?.mfa_enabled ?? false;
 
     return (
-        <Panel title="multi-factor authentication" right={enabled ? "enabled" : "disabled"}>
-            <div className="space-y-3 p-1 text-[11px]">
+        <Panel
+            title="Two-factor authentication"
+            right={
+                <span className={enabled ? "text-accent-700" : "text-fg-dim"}>
+                    {enabled ? "Enabled" : "Not enrolled"}
+                </span>
+            }
+            rule
+            bodyClassName="p-3.5"
+        >
+            <div className="space-y-3">
                 {ok && <Notice kind="ok">{ok}</Notice>}
                 {error && <Notice kind="error">{error}</Notice>}
 
                 {enabled ? (
-                    <form onSubmit={disable} className="space-y-2">
-                        <p className="text-fg-dim">
-                            Time-based one-time codes are active on this account. Enter a current code
-                            to turn MFA off.
+                    <form onSubmit={disable} className="space-y-3">
+                        <p className="max-w-[60ch] text-[12px] leading-[1.6] text-neutral-800">
+                            Time-based one-time codes are active on this account. Enter a current
+                            code to turn them off. Admin access to the operations console requires
+                            this factor.
                         </p>
-                        <Field label="current code" inputMode="numeric" maxLength={6} value={code}
-                            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} />
-                        <Button type="submit" variant="danger" disabled={busy || code.length !== 6}>
-                            {busy ? "working…" : "disable mfa"}
-                        </Button>
+                        <div className="flex flex-wrap items-end gap-2.5">
+                            <div className="field w-[180px]">
+                                <label htmlFor="mfa-off">Verification code</label>
+                                <input
+                                    id="mfa-off"
+                                    className="input tracking-[0.3em]"
+                                    inputMode="numeric"
+                                    maxLength={6}
+                                    placeholder="000000"
+                                    value={code}
+                                    onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                                />
+                            </div>
+                            <Button type="submit" disabled={busy || code.length !== 6}>
+                                {busy ? "Working…" : "Disable"}
+                            </Button>
+                        </div>
                     </form>
                 ) : setup ? (
-                    <form onSubmit={confirm} className="space-y-3">
-                        <p className="text-fg-dim">
-                            Scan this in your authenticator app, or enter the secret manually, then
-                            confirm with the first code.
-                        </p>
-                        {qrSvg && (
-                            <div
-                                className="mx-auto w-[180px] border border-line bg-bg p-2"
-                                // QR is generated locally from the otpauth URI; no external calls.
-                                dangerouslySetInnerHTML={{ __html: qrSvg }}
-                            />
-                        )}
-                        <div className="break-all border border-line bg-bg px-2 py-1.5 text-[10px] text-fg-dim">
-                            secret: <span className="text-fg">{setup.secret}</span>
-                        </div>
-                        <Field label="first code" inputMode="numeric" maxLength={6} value={code}
-                            onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} />
-                        <div className="flex gap-2">
-                            <Button type="submit" disabled={busy || code.length !== 6}>
-                                {busy ? "verifying…" : "confirm & enable"}
-                            </Button>
-                            <Button type="button" variant="ghost" onClick={() => setSetup(null)}>
-                                cancel
-                            </Button>
+                    <form onSubmit={confirm} className="grid gap-4.5 sm:grid-cols-[150px_1fr]">
+                        <div
+                            className="h-[150px] w-[150px] bg-panel-hi p-2.5"
+                            // QR is generated locally from the otpauth URI; no external calls.
+                            dangerouslySetInnerHTML={{ __html: qrSvg }}
+                        />
+                        <div>
+                            <p className="max-w-[60ch] text-[12px] leading-[1.6] text-neutral-800">
+                                Scan the code with a TOTP authenticator, then confirm a six-digit
+                                code. Admin access to the operations console is gated behind this
+                                factor.
+                            </p>
+                            <div className="mt-3 text-[11px] uppercase tracking-[0.1em] text-fg-dim">
+                                Secret
+                            </div>
+                            <div className="break-all font-heading text-[15px] font-extrabold tracking-[0.18em]">
+                                {grouped(setup.secret)}
+                            </div>
+                            <div className="mt-3.5 flex flex-wrap items-end gap-2.5">
+                                <div className="field w-[180px]">
+                                    <label htmlFor="mfa-code">Verification code</label>
+                                    <input
+                                        id="mfa-code"
+                                        className="input tracking-[0.3em]"
+                                        inputMode="numeric"
+                                        maxLength={6}
+                                        placeholder="000000"
+                                        value={code}
+                                        onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
+                                    />
+                                </div>
+                                <Button type="submit" disabled={busy || code.length !== 6}>
+                                    {busy ? "Verifying…" : "Verify & enable"}
+                                </Button>
+                                <Button type="button" variant="secondary" onClick={() => setSetup(null)}>
+                                    Cancel
+                                </Button>
+                            </div>
                         </div>
                     </form>
                 ) : (
-                    <div className="space-y-2">
-                        <p className="text-fg-dim">
-                            Add a second factor (TOTP). Strongly recommended for any account that can
-                            reach the admin console.
+                    <div className="space-y-3">
+                        <p className="max-w-[60ch] text-[12px] leading-[1.6] text-neutral-800">
+                            Add a second factor (TOTP). Required for any account that can reach the
+                            operations console.
                         </p>
                         <Button type="button" onClick={begin} disabled={busy}>
-                            {busy ? "starting…" : "set up mfa"}
+                            {busy ? "Starting…" : "Set up MFA"}
                         </Button>
                     </div>
                 )}

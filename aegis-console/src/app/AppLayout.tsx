@@ -1,7 +1,11 @@
 /* =============================================================================
- * AppLayout — chrome for authenticated screens: brand, identity readout, nav,
+ * AppLayout — chrome for authenticated screens: brand, nav, identity readout,
  * and a live UTC clock. The identity strip surfaces the /me role + risk score
  * so the operator always knows who they are and what posture they're at.
+ *
+ * Nav is a row of hard-edged buttons; the active one is filled vermilion. That
+ * single filled block is the only accent in the header, so "where am I" is
+ * answerable at a glance from across the desk.
  * ========================================================================== */
 
 import { useEffect, useState, type ReactNode } from "react";
@@ -9,13 +13,13 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "@/lib/auth/AuthContext";
 
 function navClass({ isActive }: { isActive: boolean }) {
-    return `border px-2.5 py-1 text-[10px] uppercase tracking-wide hover:brightness-125 ${
-        isActive ? "border-line bg-panel-hi text-accent" : "border-transparent text-fg-dim"
+    return `cursor-pointer border-0 px-3 py-1.5 font-heading text-[11px] font-extrabold uppercase tracking-[0.14em] ${
+        isActive ? "bg-accent text-bg" : "bg-transparent text-fg-dim hover:text-fg"
     }`;
 }
 
 export function AppLayout({ children }: { children: ReactNode }) {
-    const { user, logout } = useAuth();
+    const { user, role, logout } = useAuth();
     const navigate = useNavigate();
     const [clock, setClock] = useState(new Date());
 
@@ -31,32 +35,38 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
     return (
         <div className="min-h-screen">
-            <header className="flex items-center justify-between border-b border-line px-3.5 py-2.5">
-                <div className="flex items-center gap-3.5">
-                    <span className="text-[15px] font-bold tracking-[2px] text-accent">
-                        aegis<span className="text-fg-dim">::</span>SOC
+            <header className="flex h-[52px] items-center justify-between gap-6 border-b-2 border-line bg-panel px-4">
+                <div className="flex items-center gap-7">
+                    <span className="font-heading text-[15px] font-extrabold tracking-[0.2em] text-accent">
+                        AEGIS<span className="text-neutral-500">::</span>
+                        <span className="text-fg">SOC</span>
                     </span>
-                    <nav className="flex gap-1">
-                        <NavLink to="/dashboard" className={navClass}>dashboard</NavLink>
-                        <NavLink to="/account" className={navClass}>account</NavLink>
+                    <nav className="flex gap-0.5">
+                        {role === "admin" && (
+                            <>
+                                <NavLink to="/dashboard" className={navClass}>Console</NavLink>
+                                <NavLink to="/range" className={navClass}>Attack range</NavLink>
+                            </>
+                        )}
+                        <NavLink to="/account" className={navClass}>Account</NavLink>
                     </nav>
                 </div>
                 <div className="flex items-center gap-4 text-[11px] text-fg-dim">
-                    <span>{clock.toISOString().replace("T", " ").slice(0, 19)}Z</span>
+                    <span className="hidden tracking-[0.06em] md:inline">
+                        {clock.toISOString().replace("T", " ").slice(0, 19)}Z
+                    </span>
                     {user && (
                         <span className="flex items-center gap-2">
-                            <span className="text-fg">{user.email}</span>
-                            <span className="border border-line px-1.5 py-0.5 text-[9px] uppercase tracking-wide text-accent">
-                                {user.role}
-                            </span>
+                            <span className="hidden text-fg sm:inline">{user.email}</span>
+                            <span className="tag tag-accent text-[10px]">{user.role}</span>
                             <span title="session risk score">risk {user.risk_score}</span>
                         </span>
                     )}
                     <button
                         onClick={onLogout}
-                        className="border border-line px-2.5 py-1 text-[10px] uppercase tracking-wide text-fg-dim hover:text-sev-high hover:border-sev-high/50"
+                        className="btn btn-secondary btn-micro"
                     >
-                        sign out
+                        Sign out
                     </button>
                 </div>
             </header>

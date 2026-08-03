@@ -16,7 +16,7 @@ docker compose up -d --build                   # db + redis + api + web
 docker compose --profile seed run --rm seed    # demo accounts
 ```
 
-Open **http://localhost:8080**.
+Open **https://localhost**.
 
 ```
 admin : admin@test.com  / AdminPass123!    (must enroll TOTP on first login)
@@ -41,7 +41,7 @@ HashiCorp Vault instead of the static password:
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.vault.yml up -d --build
 docker compose --profile seed run --rm seed
-# console -> http://localhost:8080     Vault UI -> http://localhost:8200 (token: root)
+# console -> https://localhost     Vault UI -> http://localhost:8200 (token: root)
 ```
 
 `vault-init` (`vault/init.sh`) enables the database secrets engine and defines

@@ -37,27 +37,27 @@ export default function ForgotPasswordPage() {
     }
 
     return (
-        <AuthShell barLabel="recover access" subtitle="reset password">
+        <AuthShell barLabel="Recover access" subtitle="Reset password">
             {sent ? (
                 <div className="space-y-3">
                     <Notice kind="ok">
                         If an account exists for that email, a reset link is on its way. The link
                         expires shortly.
                     </Notice>
-                    <div className="text-center text-[10px] text-fg-dim">
-                        <Link to="/login" className="text-accent hover:underline">back to sign in</Link>
+                    <div className="text-center text-[11px] text-fg-dim">
+                        <Link to="/login" className="text-accent-700 hover:underline">Back to sign in</Link>
                     </div>
                 </div>
             ) : (
                 <form onSubmit={onSubmit} className="space-y-3">
-                    <Field label="email" type="email" autoComplete="email" required value={email}
+                    <Field label="Email" type="email" autoComplete="email" required value={email}
                         onChange={(e) => setEmail(e.target.value)} />
                     {error && <Notice kind="error">{error}</Notice>}
                     <Button type="submit" disabled={submitting} className="w-full">
-                        {submitting ? "sending…" : "send reset link"}
+                        {submitting ? "Sending…" : "Send reset link"}
                     </Button>
-                    <div className="pt-1 text-center text-[10px] text-fg-dim">
-                        <Link to="/login" className="text-accent hover:underline">back to sign in</Link>
+                    <div className="pt-1 text-center text-[11px] text-fg-dim">
+                        <Link to="/login" className="text-accent-700 hover:underline">Back to sign in</Link>
                     </div>
                 </form>
             )}

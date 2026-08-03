@@ -53,7 +53,7 @@ export default function ResetPasswordPage() {
 
     if (!token) {
         return (
-            <AuthShell barLabel="recover access" subtitle="reset password">
+            <AuthShell barLabel="Recover access" subtitle="Reset password">
                 <Notice kind="error">
                     Missing reset token. Open the link from your email, or{" "}
                     <Link to="/forgot-password" className="underline">request a new one</Link>.
@@ -63,19 +63,19 @@ export default function ResetPasswordPage() {
     }
 
     return (
-        <AuthShell barLabel="recover access" subtitle="set a new password">
+        <AuthShell barLabel="Recover access" subtitle="New password">
             {done ? (
                 <Notice kind="ok">Password updated. Redirecting to sign in…</Notice>
             ) : (
                 <form onSubmit={onSubmit} className="space-y-3">
-                    <Field label="new password" type="password" autoComplete="new-password" required
+                    <Field label="New password" type="password" autoComplete="new-password" required
                         value={password} onChange={(e) => setPassword(e.target.value)}
                         hint={`min ${MIN_PASSWORD} chars`} />
-                    <Field label="confirm password" type="password" autoComplete="new-password" required
+                    <Field label="Confirm password" type="password" autoComplete="new-password" required
                         value={confirm} onChange={(e) => setConfirm(e.target.value)} />
                     {error && <Notice kind="error">{error}</Notice>}
                     <Button type="submit" disabled={submitting} className="w-full">
-                        {submitting ? "updating…" : "update password"}
+                        {submitting ? "Updating…" : "Update password"}
                     </Button>
                 </form>
             )}

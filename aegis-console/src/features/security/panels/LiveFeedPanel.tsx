@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Panel } from "@/components/Panel";
 import { SevDot } from "@/components/SevDot";
-import { SEVERITIES, sevText } from "@/components/severity";
+import { SEVERITIES, sevChip } from "@/components/severity";
 import type { Severity, SecurityEvent } from "@/types";
 
 /** "City, CC" from event geoip metadata, if present. */
@@ -14,6 +14,9 @@ function geoLabel(e: SecurityEvent): string | null {
     return label.length > 0 ? label : null;
 }
 
+/* The live feed — the panel the console lives on. Fixed column widths and
+ * tabular figures so rows don't reflow as events land; the newest row flashes
+ * once in accent tint, which is the only motion in the layout. */
 export function LiveFeedPanel({ events, live }: { events: SecurityEvent[]; live: boolean }) {
     const [filter, setFilter] = useState<"all" | Severity>("all");
     const shown = filter === "all" ? events : events.filter((e) => e.severity === filter);
@@ -30,54 +33,76 @@ export function LiveFeedPanel({ events, live }: { events: SecurityEvent[]; live:
 
     return (
         <Panel
-            title="live event feed · SOC reporter"
+            title="Live event feed"
             right={
-                <div className="flex gap-1">
-                    {(["all", ...SEVERITIES] as const).map((s) => (
-                        <button key={s} onClick={() => setFilter(s)}
-                            className={`border px-2 py-0.5 text-[9px] uppercase tracking-wide hover:brightness-125 ${
-                                filter === s
-                                    ? `border-line bg-panel-hi ${s === "all" ? "text-accent" : sevText[s as Severity]}`
-                                    : "border-transparent text-fg-dim"
-                            }`}>
-                            {s}
-                        </button>
-                    ))}
-                </div>
-            }
-        >
-            <div className="flex items-center gap-3 border-b border-grid bg-panel-hi/40 px-2 py-1 text-[9px] uppercase tracking-[1.5px] text-fg-dim">
-                <span>{counts.total} events</span>
-                <span className="text-sev-critical">{counts.crit} crit</span>
-                <span className="text-sev-high">{counts.high} high</span>
-                <span className={`ml-auto flex items-center gap-1 ${live ? "text-accent" : "text-fg-dim"}`}>
-                    <span className={`inline-block h-1.5 w-1.5 rounded-full ${live ? "bg-accent pulse" : "bg-fg-dim"}`} />
-                    {live ? "streaming" : "paused"}
+                <span className="flex gap-0.5">
+                    {(["all", ...SEVERITIES] as const).map((s) => {
+                        const active = filter === s;
+                        const chip =
+                            s === "all" ? "bg-fg text-bg" : sevChip[s as Severity];
+                        return (
+                            <button
+                                key={s}
+                                onClick={() => setFilter(s)}
+                                className={`cursor-pointer px-1.5 py-1 text-[9px] uppercase tracking-[0.12em] ${
+                                    active
+                                        ? `border border-transparent ${chip}`
+                                        : "border border-neutral-300 bg-transparent text-fg-dim hover:text-fg"
+                                }`}
+                            >
+                                {s}
+                            </button>
+                        );
+                    })}
                 </span>
+            }
+            bodyClassName=""
+        >
+            <div className="flex gap-4 border-b border-neutral-300 px-3 py-1.5 text-[10px] uppercase tracking-[0.14em] text-fg-dim">
+                <span>{counts.total.toLocaleString()} events</span>
+                <span className="text-accent-700">{counts.crit} crit</span>
+                <span>{counts.high} high</span>
+                <span className="ml-auto">{live ? "Live" : "Paused"}</span>
             </div>
 
-            <div className="h-[320px] overflow-y-auto font-mono text-[11px]">
+            <div className="h-[340px] overflow-y-auto overflow-x-hidden">
                 {shown.length === 0 ? (
-                    <div className="p-2.5 text-fg-dim">No events match this filter.</div>
+                    <div className="p-3 text-[11px] text-fg-dim">No events match this filter.</div>
                 ) : (
-                    <table className="w-full border-collapse">
+                    <table className="table table-fixed text-[11px]">
                         <tbody>
                             {shown.slice(0, 150).map((e, i) => {
                                 const loc = geoLabel(e);
-                                const crit = e.severity === "critical";
+                                const hot = e.severity === "critical" || e.severity === "high";
                                 return (
-                                    <tr key={e.id}
-                                        className={`border-b border-grid ${i === 0 && live ? "row-flash" : ""} ${crit ? "bg-sev-critical/[0.06]" : ""}`}>
-                                        <td className="whitespace-nowrap px-1.5 py-1.5 text-fg-dim">
+                                    <tr
+                                        key={e.id}
+                                        className={`${i === 0 && live ? "row-flash" : ""} ${
+                                            e.severity === "critical" ? "bg-accent-100" : ""
+                                        }`}
+                                    >
+                                        <td className="w-[74px] whitespace-nowrap px-2.5 py-1 text-fg-dim">
                                             {new Date(e.created_at).toISOString().slice(11, 19)}
                                         </td>
-                                        <td className="w-4 px-1 py-1.5"><SevDot sev={e.severity} /></td>
-                                        <td className={`whitespace-nowrap px-1.5 py-1.5 font-semibold ${sevText[e.severity]}`}>
+                                        <td className="w-3.5 py-1">
+                                            <SevDot sev={e.severity} />
+                                        </td>
+                                        <td
+                                            className={`truncate px-2 py-1 font-heading text-[10px] font-extrabold tracking-[0.06em] ${
+                                                hot ? "text-accent-700" : "text-fg"
+                                            }`}
+                                        >
                                             {e.event_type}
                                         </td>
-                                        <td className="px-1.5 py-1.5 text-fg-dim">{e.user_id ? `uid:${e.user_id}` : "—"}</td>
-                                        <td className="px-1.5 py-1.5 text-fg-dim">{e.ip_address ?? "—"}</td>
-                                        <td className="whitespace-nowrap px-1.5 py-1.5 text-accent/80">{loc ?? ""}</td>
+                                        <td className="w-[62px] whitespace-nowrap px-2 py-1 text-fg-dim">
+                                            {e.user_id ? `uid:${e.user_id}` : "—"}
+                                        </td>
+                                        <td className="w-[116px] whitespace-nowrap px-2 py-1 text-fg-dim">
+                                            {e.ip_address ?? "—"}
+                                        </td>
+                                        <td className="w-[124px] truncate px-2.5 py-1 text-right text-neutral-800">
+                                            {loc ?? ""}
+                                        </td>
                                     </tr>
                                 );
                             })}

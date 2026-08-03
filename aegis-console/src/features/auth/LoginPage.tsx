@@ -8,7 +8,6 @@ import { ApiClientError } from "@/lib/api/client";
 import { passkeysSupported } from "@/lib/auth/webauthn";
 import { AuthShell } from "@/components/AuthShell";
 import { Field } from "@/components/Field";
-import { Button } from "@/components/Button";
 import { Notice } from "@/components/Notice";
 
 export default function LoginPage() {
@@ -71,30 +70,56 @@ export default function LoginPage() {
     }
 
     return (
-        <AuthShell barLabel="authenticate" subtitle="sign in">
-            <form onSubmit={onSubmit} className="space-y-3">
-                <Field label="email" type="email" autoComplete="email" required value={email}
-                    onChange={(e) => setEmail(e.target.value)} />
-                <Field label="password" type="password" autoComplete="current-password" required
-                    value={password} onChange={(e) => setPassword(e.target.value)} />
-                {error && <Notice kind="error">{error}</Notice>}
-                <Button type="submit" disabled={submitting} className="w-full">
-                    {submitting ? "authenticating…" : "sign in"}
-                </Button>
-
-                <div className="flex items-center gap-2 py-0.5 text-[10px] uppercase text-fg-dim">
-                    <span className="h-px flex-1 bg-grid" />
-                    or
-                    <span className="h-px flex-1 bg-grid" />
+        <AuthShell barLabel="Authenticate" subtitle="Sign in">
+            <form onSubmit={onSubmit}>
+                <div className="mb-3.5">
+                    <Field
+                        label="Email"
+                        type="email"
+                        autoComplete="email"
+                        required
+                        placeholder="operator@aegis.io"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                    />
                 </div>
-                <Button type="button" variant="ghost" onClick={onPasskey}
-                    disabled={passkeyBusy} className="w-full">
-                    {passkeyBusy ? "waiting for device…" : "sign in with a passkey"}
-                </Button>
+                <div className="mb-4.5">
+                    <Field
+                        label="Password"
+                        type="password"
+                        autoComplete="current-password"
+                        required
+                        placeholder="••••••••••"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                    />
+                </div>
 
-                <div className="flex items-center justify-between pt-1 text-[10px] text-fg-dim">
-                    <Link to="/forgot-password" className="hover:text-accent">forgot password?</Link>
-                    <Link to="/register" className="text-accent hover:underline">register</Link>
+                {error && (
+                    <div className="mb-3.5">
+                        <Notice kind="error">{error}</Notice>
+                    </div>
+                )}
+
+                <button type="submit" disabled={submitting} className="btn btn-primary btn-block">
+                    {submitting ? "Authenticating…" : "Sign in →"}
+                </button>
+                <button
+                    type="button"
+                    onClick={onPasskey}
+                    disabled={passkeyBusy}
+                    className="btn btn-secondary btn-block"
+                >
+                    {passkeyBusy ? "Waiting for device…" : "Sign in with a passkey"}
+                </button>
+
+                <div className="mt-4.5 flex justify-between text-[11px] uppercase tracking-[0.1em]">
+                    <Link to="/forgot-password" className="text-fg-dim hover:text-accent-700">
+                        Forgot password?
+                    </Link>
+                    <Link to="/register" className="text-accent-700 hover:underline">
+                        Register
+                    </Link>
                 </div>
             </form>
         </AuthShell>

@@ -54,7 +54,7 @@ services:
       SERVER_ADDR: 0.0.0.0:3000
       BASE_URL: http://localhost:8080
       WEBAUTHN_RP_ID: localhost
-      WEBAUTHN_RP_ORIGIN: http://localhost:8080
+      WEBAUTHN_RP_ORIGIN: https://localhost
       WEBAUTHN_RP_NAME: Aegis
       RUST_LOG: info
     volumes:
@@ -72,10 +72,20 @@ services:
       context: .
       dockerfile: docker/web.Dockerfile
     ports:
-      - "8080:80"
+      # 443 so the console lives at https://localhost with no port in the URL —
+      # which is also exactly the origin WEBAUTHN_RP_ORIGIN declares.
+      - "443:443"
+      # 80 only redirects to HTTPS; nothing is served in cleartext.
+      - "80:80"
     depends_on:
       api:
         condition: service_healthy   # don't serve a console that 502s on every call
+    volumes:
+      # Caddy's internal CA lives here. Without a volume it is regenerated on
+      # every `down`, so a certificate trusted yesterday is untrusted today and
+      # the browser warning reappears mid-demo.
+      - caddy_data:/data
+      - caddy_config:/config
     restart: unless-stopped
 
   seed:
@@ -95,5 +105,7 @@ services:
         condition: service_healthy
 
 volumes:
+  caddy_data:
+  caddy_config:
   db-data:
   api-keys:

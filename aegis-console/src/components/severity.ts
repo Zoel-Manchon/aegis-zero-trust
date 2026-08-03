@@ -18,13 +18,22 @@ export const sevBg: Record<Severity, string> = {
     critical: "bg-sev-critical",
 };
 
+/* Chip pairs for severity badges — neutral steps for the quiet end of the ramp,
+ * vermilion only from `high` up, so a red chip always means "act". */
+export const sevChip: Record<Severity, string> = {
+    info: "bg-neutral-200 text-neutral-800",
+    low: "bg-neutral-200 text-neutral-900",
+    medium: "bg-neutral-300 text-neutral-900",
+    high: "bg-accent-200 text-accent-800",
+    critical: "bg-accent text-bg",
+};
+
 /* Mirrors the --color-sev-* tokens in index.css. SVG fills need literal values,
- * so any change here must be made there too. Contrast on --color-panel:
- * info 7.2:1 · low 11.1:1 · medium 13.5:1 · high 9.3:1 · critical 6.9:1. */
+ * so any change here must be made there too. */
 export const sevHex: Record<Severity, string> = {
-    info: "#7aa2d6",
-    low: "#4fd6ee",
-    medium: "#ffd45e",
-    high: "#ff9d52",
-    critical: "#ff6b6b",
+    info: "#9b9797",
+    low: "#7d7979",
+    medium: "#444141",
+    high: "#dd2b0f",
+    critical: "#ec3013",
 };

@@ -56,21 +56,21 @@ export default function VerifyEmailPage() {
 
     if (token) {
         return (
-            <AuthShell barLabel="verify email" subtitle="confirming address">
+            <AuthShell barLabel="Verify email" subtitle="Confirming address">
                 {confirm === "pending" && <Notice kind="info">Confirming your email…</Notice>}
                 {confirm === "ok" && (
                     <div className="space-y-3">
                         <Notice kind="ok">Email verified. You're all set.</Notice>
-                        <div className="text-center text-[10px] text-fg-dim">
-                            <Link to="/login" className="text-accent hover:underline">continue to sign in</Link>
+                        <div className="text-center text-[11px] text-fg-dim">
+                            <Link to="/login" className="text-accent-700 hover:underline">Continue to sign in</Link>
                         </div>
                     </div>
                 )}
                 {confirm === "error" && (
                     <div className="space-y-3">
                         <Notice kind="error">This verification link is invalid or has expired.</Notice>
-                        <div className="text-center text-[10px] text-fg-dim">
-                            <Link to="/verify-email" className="text-accent hover:underline">request a new link</Link>
+                        <div className="text-center text-[11px] text-fg-dim">
+                            <Link to="/verify-email" className="text-accent-700 hover:underline">Request a new link</Link>
                         </div>
                     </div>
                 )}
@@ -79,21 +79,21 @@ export default function VerifyEmailPage() {
     }
 
     return (
-        <AuthShell barLabel="verify email" subtitle="request a verification link">
+        <AuthShell barLabel="Verify email" subtitle="Verify email">
             {requested ? (
                 <Notice kind="ok">
                     If that address needs verification, a link is on its way.
                 </Notice>
             ) : (
                 <form onSubmit={onRequest} className="space-y-3">
-                    <Field label="email" type="email" autoComplete="email" required value={email}
+                    <Field label="Email" type="email" autoComplete="email" required value={email}
                         onChange={(e) => setEmail(e.target.value)} />
                     {reqError && <Notice kind="error">{reqError}</Notice>}
                     <Button type="submit" disabled={submitting} className="w-full">
-                        {submitting ? "sending…" : "send verification link"}
+                        {submitting ? "Sending…" : "Send verification link"}
                     </Button>
-                    <div className="pt-1 text-center text-[10px] text-fg-dim">
-                        <Link to="/login" className="text-accent hover:underline">back to sign in</Link>
+                    <div className="pt-1 text-center text-[11px] text-fg-dim">
+                        <Link to="/login" className="text-accent-700 hover:underline">Back to sign in</Link>
                     </div>
                 </form>
             )}

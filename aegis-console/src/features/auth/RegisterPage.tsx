@@ -54,20 +54,20 @@ export default function RegisterPage() {
     }
 
     return (
-        <AuthShell barLabel="provision account" subtitle="new account">
+        <AuthShell barLabel="Provision account" subtitle="Create account">
             <form onSubmit={onSubmit} className="space-y-3">
-                <Field label="email" type="email" autoComplete="email" required value={email}
+                <Field label="Email" type="email" autoComplete="email" required value={email}
                     onChange={(e) => setEmail(e.target.value)} />
-                <Field label="password" type="password" autoComplete="new-password" required
+                <Field label="Password" type="password" autoComplete="new-password" required
                     value={password} onChange={(e) => setPassword(e.target.value)}
                     hint={`min ${MIN_PASSWORD} chars · server enforces full policy`} />
                 {error && <Notice kind="error">{error}</Notice>}
                 <Button type="submit" disabled={submitting} className="w-full">
-                    {submitting ? "provisioning…" : "create account"}
+                    {submitting ? "Provisioning…" : "Create account"}
                 </Button>
-                <div className="pt-1 text-center text-[10px] text-fg-dim">
-                    already have one?{" "}
-                    <Link to="/login" className="text-accent hover:underline">sign in</Link>
+                <div className="pt-1 text-center text-[11px] text-fg-dim">
+                    Already have an account?{" "}
+                    <Link to="/login" className="text-accent-700 hover:underline">Sign in</Link>
                 </div>
             </form>
         </AuthShell>

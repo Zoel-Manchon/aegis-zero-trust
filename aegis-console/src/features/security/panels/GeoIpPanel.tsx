@@ -1,22 +1,37 @@
 import { Panel } from "@/components/Panel";
 import type { GeoPoint } from "@/features/security/derive";
 
-export function GeoIpPanel({ points }: { points: GeoPoint[] }) {
+/* GeoIP origins. Network type is the column that matters most: a datacenter or
+ * hosting ASN behind a "user" login is a finding on its own. */
+export function GeoIpPanel({ points, className = "" }: { points: GeoPoint[]; className?: string }) {
+    const max = Math.max(1, ...points.map((p) => p.count));
     return (
-        <Panel title="geo ip intelligence" right={`${points.length} locations`}>
-            <div className="min-h-[140px] space-y-1.5">
-                {points.length === 0 ? (
-                    <div className="p-2.5 text-[11px] text-fg-dim">No GeoIP metadata yet. Generate logins from different IPs.</div>
-                ) : points.map((p) => (
-                    <div key={`${p.city}-${p.country}`} className="grid grid-cols-[1fr_auto] gap-2 border-b border-grid px-1.5 py-1.5">
-                        <div className="min-w-0">
-                            <div className="truncate text-[11px] text-fg">{p.city}, {p.country}</div>
-                            <div className="truncate text-[10px] text-fg-dim">{p.ip} · {p.network_type} · {p.latitude.toFixed(2)}, {p.longitude.toFixed(2)}</div>
-                        </div>
-                        <div className="font-bold text-accent">{p.count}</div>
-                    </div>
-                ))}
-            </div>
+        <Panel title="GeoIP origins" right="network type" className={className} bodyClassName="">
+            {points.length === 0 ? (
+                <div className="p-3 text-[11px] text-fg-dim">
+                    No GeoIP metadata yet. Sign in — or launch a scenario — from a different origin.
+                </div>
+            ) : (
+                <table className="table text-[11px]">
+                    <tbody>
+                        {points.map((p) => (
+                            <tr key={`${p.city}-${p.country}`}>
+                                <td className="px-3 py-1.5">
+                                    {p.city}, {p.country}
+                                </td>
+                                <td className="px-1.5 py-1.5 text-fg-dim">{p.network_type}</td>
+                                <td
+                                    className={`px-3 py-1.5 text-right ${
+                                        p.count / max > 0.6 ? "text-accent" : "text-neutral-800"
+                                    }`}
+                                >
+                                    {p.count}
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            )}
         </Panel>
     );
 }

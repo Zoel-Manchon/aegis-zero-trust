@@ -11,14 +11,24 @@ export interface TimeBucket {
     crit: number;
 }
 
-/** Events-per-minute for the last 30 minutes, plus a high/critical overlay. */
+/** Interval width of one event-rate bar, in ms. 40 bars x 30s = a 20-minute
+ *  window, which is what the panel's axis labels claim. */
+export const RATE_INTERVAL_MS = 30_000;
+export const RATE_BUCKETS = 40;
+
+/** Events per 30s interval over the last 20 minutes, plus a high/critical
+ *  overlay stacked on top of each bar. */
 export function timeline(events: SecurityEvent[]): TimeBucket[] {
-    const buckets: TimeBucket[] = Array.from({ length: 30 }, (_, i) => ({ t: i, count: 0, crit: 0 }));
+    const buckets: TimeBucket[] = Array.from({ length: RATE_BUCKETS }, (_, i) => ({
+        t: i,
+        count: 0,
+        crit: 0,
+    }));
     const now = Date.now();
     for (const e of events) {
-        const age = Math.floor((now - new Date(e.created_at).getTime()) / 60000);
-        if (age >= 0 && age < 30) {
-            const b = buckets[29 - age];
+        const age = Math.floor((now - new Date(e.created_at).getTime()) / RATE_INTERVAL_MS);
+        if (age >= 0 && age < RATE_BUCKETS) {
+            const b = buckets[RATE_BUCKETS - 1 - age];
             b.count++;
             if (e.severity === "critical" || e.severity === "high") b.crit++;
         }

@@ -3,7 +3,8 @@
  *
  * Public:    /login /register /mfa-challenge /forgot-password /reset-password
  *            /verify-email
- * Protected: /dashboard (admin-gated SIEM) · /account (self-service)
+ * Protected: /dashboard (admin-gated SIEM) · /range (admin-gated red team)
+ *            /account (self-service)
  * Catch-all: / and unknown → redirect by auth state.
  * ========================================================================== */
 
@@ -21,10 +22,11 @@ import ResetPasswordPage from "@/features/auth/ResetPasswordPage";
 import VerifyEmailPage from "@/features/auth/VerifyEmailPage";
 import AccountPage from "@/features/account/AccountPage";
 import Dashboard from "@/features/security/Dashboard";
+import AttackRangePage from "@/features/security/AttackRangePage";
 
 function Booting() {
     return (
-        <div className="flex min-h-screen items-center justify-center text-[11px] text-fg-dim">
+        <div className="flex min-h-screen items-center justify-center text-[11px] uppercase tracking-[0.16em] text-fg-dim">
             restoring session…
         </div>
     );
@@ -60,6 +62,18 @@ export function AppRouter() {
                             <AppLayout>
                                 <RoleRoute require="admin">
                                     <Dashboard />
+                                </RoleRoute>
+                            </AppLayout>
+                        </ProtectedRoute>
+                    }
+                />
+                <Route
+                    path="/range"
+                    element={
+                        <ProtectedRoute>
+                            <AppLayout>
+                                <RoleRoute require="admin">
+                                    <AttackRangePage />
                                 </RoleRoute>
                             </AppLayout>
                         </ProtectedRoute>

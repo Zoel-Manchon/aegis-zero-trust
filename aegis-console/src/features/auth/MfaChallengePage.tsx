@@ -43,7 +43,7 @@ export default function MfaChallengePage() {
     }
 
     return (
-        <AuthShell barLabel="step-up · mfa" subtitle="enter authenticator code">
+        <AuthShell barLabel="Step-up · MFA" subtitle="Enter code">
             <form onSubmit={onSubmit} className="space-y-3">
                 <Field
                     label="6-digit code"
@@ -58,7 +58,7 @@ export default function MfaChallengePage() {
                 />
                 {error && <Notice kind="error">{error}</Notice>}
                 <Button type="submit" disabled={submitting || code.length !== 6} className="w-full">
-                    {submitting ? "verifying…" : "verify"}
+                    {submitting ? "Verifying…" : "Verify"}
                 </Button>
             </form>
         </AuthShell>

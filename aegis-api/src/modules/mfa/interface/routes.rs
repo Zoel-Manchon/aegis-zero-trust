@@ -4,7 +4,8 @@ use crate::{
     modules::{
         auth::interface::middleware::auth_middleware::auth_middleware,
         mfa::interface::handlers::mfa_handler::{
-            complete_mfa_login_handler, disable_mfa_handler, setup_mfa_handler, verify_mfa_handler,
+            backup_codes_status_handler, complete_mfa_login_handler, disable_mfa_handler,
+            regenerate_backup_codes_handler, setup_mfa_handler, verify_mfa_handler,
             verify_setup_handler,
         },
     },
@@ -18,6 +19,8 @@ pub fn mfa_routes(state: AppState) -> Router<AppState> {
         .route("/mfa/verify-setup", post(verify_setup_handler))
         .route("/mfa/verify", post(verify_mfa_handler))
         .route("/mfa/disable", post(disable_mfa_handler))
+        .route("/mfa/backup-codes", axum::routing::get(backup_codes_status_handler))
+        .route("/mfa/backup-codes/regenerate", post(regenerate_backup_codes_handler))
         .route_layer(from_fn_with_state(state.clone(), auth_middleware));
 
     Router::new()

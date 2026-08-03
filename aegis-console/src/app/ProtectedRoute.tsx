@@ -20,7 +20,7 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 
     if (booting) {
         return (
-            <div className="flex min-h-screen items-center justify-center text-[11px] text-fg-dim">
+            <div className="flex min-h-screen items-center justify-center text-[11px] uppercase tracking-[0.16em] text-fg-dim">
                 restoring session…
             </div>
         );

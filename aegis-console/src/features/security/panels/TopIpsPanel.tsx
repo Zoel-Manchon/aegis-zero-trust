@@ -1,28 +1,36 @@
 import { Panel } from "@/components/Panel";
 import type { IpCount } from "@/features/security/derive";
 
-export function TopIpsPanel({ ips }: { ips: IpCount[] }) {
+/* Top talkers. An address that owns more than ~70% of the loudest bar turns
+ * vermilion — that's the one worth blocking. */
+export function TopIpsPanel({ ips, className = "" }: { ips: IpCount[]; className?: string }) {
     const max = ips[0]?.count ?? 1;
     return (
-        <Panel title="top source ips" right={ips.length ? `${ips.length} sources` : undefined}>
-            <div>
-                {ips.length === 0 && (
-                    <div className="p-2 text-[11px] text-fg-dim">No source addresses seen yet.</div>
-                )}
-                {ips.map((row, i) => (
-                    <div key={row.ip} className="flex items-center gap-2 px-1.5 py-1.5 text-[11px]">
-                        <span className="w-4 text-fg-mute tabular-nums">{i + 1}</span>
-                        <span className="w-[120px] truncate text-fg">{row.ip}</span>
-                        <div className="h-2 flex-1 bg-grid">
+        <Panel title="Top talkers" right="source IP" className={className} bodyClassName="px-3 py-2.5">
+            {ips.length === 0 ? (
+                <div className="text-[11px] text-fg-dim">No source addresses seen yet.</div>
+            ) : (
+                <div className="flex flex-col gap-1.5">
+                    {ips.map((row) => {
+                        const pct = Math.round((row.count / max) * 100);
+                        return (
                             <div
-                                className="h-full bg-accent"
-                                style={{ width: `${(row.count / max) * 100}%`, opacity: 0.85 }}
-                            />
-                        </div>
-                        <span className="w-7 text-right tabular-nums text-fg-dim">{row.count}</span>
-                    </div>
-                ))}
-            </div>
+                                key={row.ip}
+                                className="grid grid-cols-[118px_1fr_32px] items-center gap-2.5"
+                            >
+                                <span className="truncate text-[11px]">{row.ip}</span>
+                                <span className="h-2.5 bg-neutral-200">
+                                    <span
+                                        className={`block h-full ${pct > 70 ? "bg-accent" : "bg-neutral-600"}`}
+                                        style={{ width: `${pct}%` }}
+                                    />
+                                </span>
+                                <span className="text-right text-[11px] text-fg-dim">{row.count}</span>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
         </Panel>
     );
 }

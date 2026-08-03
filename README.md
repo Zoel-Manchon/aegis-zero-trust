@@ -6,9 +6,9 @@ time, and writes every security-relevant event into a tamper-evident audit log.
 The admin console visualizes that telemetry live and lets you launch attacks
 against the system to watch the defenses — and the detections — fire.
 
-![attack simulator demo](docs/attack_simulator.gif)
+[![Aegis — Security Operations Console](docs/poster.png)](docs/demo.mp4)
 
-
+<sub><b>▶ Click to play</b> — sign in → MFA → security operations console → attack range. Two launches from distant origins trip the impossible-travel detector live.</sub>
 
 > ⚠️ A learning / portfolio project. Hardened in many places, but review before
 > using any of it in production (and rotate every secret in the compose file).
@@ -22,6 +22,12 @@ against the system to watch the defenses — and the detections — fire.
   rotation with replay detection** (a reused refresh token revokes the family).
 - **RBAC** (`user` / `admin`).
 - **TOTP MFA — mandatory for admins**: the SOC is gated behind enrollment.
+  Codes are single-use: the consumed timestep is recorded, so a code intercepted
+  inside its ~90s validity window cannot be replayed.
+- **MFA backup codes** — ten single-use recovery codes, Argon2id-hashed at rest
+  and shown exactly once at enrollment. Losing the authenticator no longer means
+  losing the account, and a recovery login is audited under its own action so it
+  stands out in the SOC feed.
 - **Passkeys (WebAuthn)** — passwordless, phishing-resistant login. Both the
   registration and authentication ceremonies are verified server-side by
   [`webauthn-rs`](https://crates.io/crates/webauthn-rs); only public keys are
@@ -40,9 +46,9 @@ against the system to watch the defenses — and the detections — fire.
 - **Real-time SOC**: events stream live (Postgres `LISTEN/NOTIFY` → SSE); alerts
   push over WebSocket as popups **with sound**; a world map plots origins and
   impossible-travel hops.
-- **Attack Range**: pick an attacker **origin** + scenario and **launch** it from
-  the dashboard — the events stream straight into the feed; launch from two
-  distant origins to trip impossible-travel.
+- **Attack Range** (its own route, `/range`): pick an attacker **origin** +
+  scenario and **launch** it — the events stream straight into the console feed;
+  launch from two distant origins to trip impossible-travel.
 
 ---
 
@@ -50,7 +56,7 @@ against the system to watch the defenses — and the detections — fire.
 
 ```mermaid
 flowchart LR
-    U([Browser]) -->|single origin · :8080| CADDY[Caddy<br/>reverse proxy]
+    U([Browser]) -->|single origin · https://localhost| CADDY[Caddy<br/>reverse proxy · TLS]
     CADDY -->|/ static| WEB[React + Vite console]
     CADDY -->|/api/* → strip prefix → :3000| API[Rust / axum API]
     API --> PG[(PostgreSQL 17)]
@@ -152,7 +158,7 @@ cache (`aegis-api/.sqlx`), so a clone builds and runs as-is:
 ```bash
 docker compose up -d --build           # Postgres + Redis + API + Caddy(web)
 docker compose --profile seed run --rm seed  # seed admin@test.com / victim@test.com
-# open http://localhost:8080
+# open https://localhost
 ```
 
 Optionally run with **Vault**-issued dynamic, short-lived DB credentials instead
@@ -167,16 +173,17 @@ Then: sign in as **admin@test.com / AdminPass123!** → you'll hit the **MFA gat
 `victim@test.com`, and launch from two distant origins to trip impossible-travel.
 
 Full details, regenerating the schema/`.sqlx`, troubleshooting and the HTTPS
-option are in [`DOCKER.md`](./DOCKER.md). A step-by-step walkthrough of every
-feature — the one used to record the demo — is in [`DEMO.md`](./DEMO.md).
+option are in [`DOCKER.md`](./DOCKER.md).
 
 ### Reverse proxy
 
 Caddy is the single entry point (`docker/Caddyfile`): it serves the static
 console and reverse-proxies `/api/*` to the API (stripping the prefix). One
 origin means SSE, WebSocket, and the real client IP (`X-Forwarded-For`, used by
-GeoIP) all work without CORS gymnastics. A commented `tls internal` block enables
-HTTPS on `https://localhost` with Caddy's built-in CA.
+GeoIP) all work without CORS gymnastics. **TLS is on by default** via `tls
+internal` (Caddy's built-in CA) — port 80 only redirects, nothing is served in
+cleartext. A zero-trust demo over HTTP would undercut its own premise, and the
+`localhost` secure-context exemption hides bugs that appear anywhere else.
 
 ---
 
@@ -192,17 +199,20 @@ In-progress ceremony state lives in Redis between the begin/finish round-trips.
 Endpoints: `register/begin` + `register/finish` (enrol, while signed in) and
 `login/begin` + `login/finish` (sign in). The relying-party identity is set via
 `WEBAUTHN_RP_ID` / `WEBAUTHN_RP_ORIGIN` / `WEBAUTHN_RP_NAME` (defaults already match
-the local Caddy origin `http://localhost:8080`).
+the local Caddy origin `https://localhost`, which is what WEBAUTHN_RP_ORIGIN declares).
 
 ### Try it locally
 
 A passkey only works on its registered origin, so use exactly
-**http://localhost:8080**. `localhost` counts as a secure context, so no HTTPS is
-needed for testing. If you don't have a fingerprint reader or hardware key, a
-**virtual authenticator** completes the exact same flow.
+**https://localhost** — that is the value `WEBAUTHN_RP_ORIGIN` declares. Caddy
+serves it over TLS with its own internal CA, so the ceremony runs in a real
+secure context rather than relying on the `localhost` exemption. Trust the CA
+once with `docker compose exec web caddy trust`, or just accept the browser
+warning. If you don't have a fingerprint reader or hardware key, a **virtual
+authenticator** completes the exact same flow.
 
 **Chrome / Edge (simplest — built-in, no extension):**
-1. Open `http://localhost:8080` and sign in, then go to **Account**.
+1. Open `https://localhost` and sign in, then go to **Account**.
 2. Open DevTools (`F12`) → **⋮ → More tools → WebAuthn** → tick **Enable virtual
    authenticator environment**.
 3. **Add** an authenticator: Protocol **ctap2**, Transport **internal**,
@@ -215,7 +225,7 @@ needed for testing. If you don't have a fingerprint reader or hardware key, a
 Firefox has no DevTools WebAuthn panel, so install the
 [**WebDevAuthn**](https://addons.mozilla.org/firefox/addon/webdevauthn/) extension
 (a virtual authenticator that intercepts the WebAuthn calls). Enable its injector
-on the `localhost:8080` tab, configure the virtual device with algorithm **ES256**
+on the `localhost` tab, configure the virtual device with algorithm **ES256**
 and **user verification enabled**, then use **add passkey** / **sign in with a
 passkey** the same way.
 
@@ -241,8 +251,7 @@ aegis/
 ├─ vault/init.sh             # Vault database-engine config
 ├─ .dockerignore             # keeps target/ + node_modules/ out of the build context
 ├─ .gitattributes            # LF for everything executed inside a container
-├─ DOCKER.md                 # build, run, Vault, troubleshooting
-└─ DEMO.md                   # feature walkthrough + attack-range reference
+└─ DOCKER.md                 # build, run, Vault, troubleshooting
 ```
 
 ---
@@ -257,6 +266,10 @@ aegis/
   `require` / `verify-full` with a real certificate for production.
 - `.env` files and `*.pem` keys are git-ignored. If any secret was ever committed
   to history, rotate it and purge it (`git filter-repo`).
+- **Known gaps, stated plainly:** TOTP secrets are stored unencrypted (anyone
+  with DB read access can generate valid codes), and MFA attempts are throttled
+  per-IP rather than per-user. Both are tracked in the roadmap. A zero-trust lab
+  that hid its own open edges would be teaching the wrong lesson.
 
 ---
 
@@ -266,10 +279,16 @@ aegis/
 - [x] Per-request risk engine + GeoIP impossible-travel
 - [x] Mandatory TOTP MFA for admins
 - [x] Real-time SOC (SSE events + WS alert popups + sound) and geo map
-- [x] Attack Range (10 scenarios + run-all + storm) + storm-mode CLI simulator — see [`DEMO.md`](./DEMO.md)
+- [x] Attack Range (10 scenarios + run-all + storm) + storm-mode CLI simulator
 - [x] Docker Compose + Caddy single-origin delivery
 - [x] **HashiCorp Vault** — dynamic, short-lived Postgres credentials — see [`DOCKER.md`](./DOCKER.md#with-vault-dynamic-db-credentials)
 - [x] **WebAuthn / passkeys** — full registration + login ceremonies, verified server-side by `webauthn-rs`
+- [x] MFA backup codes + TOTP replay prevention
+- [x] HTTPS by default (Caddy internal CA), single origin on `https://localhost`
+- [ ] TOTP secrets encrypted at rest (Vault envelope encryption) — today they are
+      stored in plaintext, so DB read access is enough to mint valid codes
+- [ ] Per-user MFA attempt throttling — the limiter is per-IP, so six digits are
+      still brute-forceable from rotating addresses
 
 ---
 
