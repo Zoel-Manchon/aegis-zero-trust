@@ -6,9 +6,9 @@ time, and writes every security-relevant event into a tamper-evident audit log.
 The admin console visualizes that telemetry live and lets you launch attacks
 against the system to watch the defenses — and the detections — fire.
 
-[![Aegis — Security Operations Console](docs/poster.png)](docs/demo.mp4)
+https://github.com/user-attachments/assets/db154dab-3684-4ee1-919d-70c0405ac1c4
 
-<sub><b>▶ Click to play</b> — sign in → MFA → security operations console → attack range. Two launches from distant origins trip the impossible-travel detector live.</sub>
+<sub>Sign in → MFA → security operations console → attack range. Two launches from distant origins trip the impossible-travel detector live.</sub>
 
 > ⚠️ A learning / portfolio project. Hardened in many places, but review before
 > using any of it in production (and rotate every secret in the compose file).
