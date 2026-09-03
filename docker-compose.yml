@@ -51,6 +51,10 @@ services:
       DB_SSL_MODE: disable          # internal network; flip to require/verify-full for real TLS
       REDIS_URL: redis://redis:6379/
       REFRESH_SECRET: change-me-in-production-at-least-32-characters
+      # Wraps the per-seed data keys that encrypt TOTP secrets at rest. This is
+      # a known development value: with the Vault overlay the KEK lives in
+      # Vault's transit engine instead and this variable is ignored.
+      MFA_KEK: ZGV2LW9ubHkta2V5LWRvLW5vdC11c2UtaW4tcHJvZAo=
       SERVER_ADDR: 0.0.0.0:3000
       BASE_URL: http://localhost:8080
       WEBAUTHN_RP_ID: localhost

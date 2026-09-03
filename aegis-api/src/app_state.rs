@@ -18,6 +18,7 @@
 // ============================================================================
 
 use crate::core::cache::redis::RedisClient;
+use crate::core::crypto::mfa_cipher::MfaCipher;
 use crate::modules::alerts::application::channel::AlertChannel;
 use crate::modules::alerts::application::dispatcher::AlertDispatcher;
 use crate::modules::alerts::domain::alert::Alert;
@@ -50,6 +51,11 @@ pub struct AppState {
     // --- alerts: notification delivery ---
     pub alerts: AlertDispatcher,
     pub alert_bus: broadcast::Sender<Alert>,
+
+    /// Envelope cipher for TOTP seeds at rest. Built once from the environment
+    /// so the posture (Vault transit, local KEK, or plaintext) is decided in a
+    /// single place and logged at startup.
+    pub mfa_cipher: Arc<MfaCipher>,
 }
 
 impl AppState {
@@ -74,6 +80,7 @@ impl AppState {
             Arc::new(BroadcastAlertChannel::new(alert_bus.clone())),
         ];
         let alerts = AlertDispatcher::new(channels);
+        let mfa_cipher = Arc::new(MfaCipher::from_env());
 
         Self {
             pool,
@@ -84,6 +91,7 @@ impl AppState {
             risk_history,
             alerts,
             alert_bus,
+            mfa_cipher,
         }
     }
 }

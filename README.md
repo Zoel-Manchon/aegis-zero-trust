@@ -285,10 +285,15 @@ aegis/
 - [x] **WebAuthn / passkeys** — full registration + login ceremonies, verified server-side by `webauthn-rs`
 - [x] MFA backup codes + TOTP replay prevention
 - [x] HTTPS by default (Caddy internal CA), single origin on `https://localhost`
-- [ ] TOTP secrets encrypted at rest (Vault envelope encryption) — today they are
-      stored in plaintext, so DB read access is enough to mint valid codes
-- [ ] Per-user MFA attempt throttling — the limiter is per-IP, so six digits are
-      still brute-forceable from rotating addresses
+- [x] **TOTP seeds encrypted at rest** — envelope encryption: each seed is sealed
+      with AES-256-GCM under its own data key, and that key is wrapped by Vault's
+      transit engine (or a local KEK outside Docker). Reading the database is no
+      longer enough to mint codes; legacy plaintext rows keep working and convert
+      on re-enrolment
+- [x] **Per-user MFA attempt throttling** — the per-IP limiter stays as an edge
+      filter, and every endpoint that accepts a second factor now also spends a
+      per-account failure budget, so rotating addresses no longer buys guesses.
+      Tripping it fires a Critical SOC alert naming the account
 
 ---
 

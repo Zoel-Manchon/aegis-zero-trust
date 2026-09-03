@@ -70,6 +70,30 @@ pub async fn brute_force_lockout(
     alerts.dispatch(&alert).await;
 }
 
+/// Fire when per-user MFA throttling locks an account. Unlike a login lockout,
+/// this one means someone already holds a valid password (or a valid MFA token)
+/// and is now guessing the second factor — a much later stage of the attack.
+pub async fn mfa_lockout(
+    alerts: &AlertDispatcher,
+    user_id: i64,
+    failed_attempts: i64,
+    lockout_seconds: u64,
+) {
+    let alert = Alert::new(
+        "mfa_lockout",
+        AlertSeverity::Critical,
+        "MFA brute-force lockout triggered",
+        format!(
+            "User {user_id} accumulated {failed_attempts} failed second-factor              attempts and is locked out for {lockout_seconds} seconds. The first              factor was already satisfied, so treat the password as compromised."
+        ),
+    )
+    .with_meta("user_id", user_id.to_string())
+    .with_meta("failed_attempts", failed_attempts.to_string())
+    .with_meta("lockout_seconds", lockout_seconds.to_string());
+
+    alerts.dispatch(&alert).await;
+}
+
 /// Fire when an RBAC / policy check denies a request.
 pub async fn rbac_denied(
     alerts: &AlertDispatcher,

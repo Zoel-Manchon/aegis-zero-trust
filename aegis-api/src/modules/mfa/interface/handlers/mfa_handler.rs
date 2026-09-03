@@ -9,7 +9,10 @@ use crate::{
             interface::middleware::{security_context::SecurityContext, extractor_helpers::extract_client_ip},
         },
         mfa::{
-            application::mfa_service::{self, SecondFactor},
+            application::{
+                mfa_service::{self, SecondFactor},
+                mfa_throttle_service,
+            },
             interface::dto::VerifyMfaRequest,
         },
     },
@@ -57,7 +60,7 @@ pub async fn setup_mfa_handler(
     State(state): State<AppState>,
     Extension(ctx): Extension<SecurityContext>,
 ) -> Result<Json<ApiResponse<MfaSetupResponse>>, AppError> {
-    let setup = mfa_service::setup_mfa(&state.pool, ctx.user_id, "user").await?;
+    let setup = mfa_service::setup_mfa(&state.pool, &state.mfa_cipher, ctx.user_id, "user").await?;
 
     security_audit::mfa_setup_started(
         &state.pool,
@@ -84,7 +87,7 @@ pub async fn verify_setup_handler(
 ) -> Result<Json<ApiResponse<BackupCodesResponse>>, AppError> {
     req.validate()?;
 
-    let issued = mfa_service::verify_setup(&state.pool, ctx.user_id, &req.code).await?;
+    let issued = mfa_service::verify_setup(&state.pool, &state.mfa_cipher, ctx.user_id, &req.code).await?;
 
     let Some(backup_codes) = issued else {
         security_audit::mfa_failure(
@@ -128,10 +131,15 @@ pub async fn regenerate_backup_codes_handler(
 ) -> Result<Json<ApiResponse<BackupCodesResponse>>, AppError> {
     req.validate()?;
 
-    if mfa_service::verify_second_factor(&state.pool, ctx.user_id, &req.code)
+    mfa_throttle_service::check_mfa_allowed(&state.redis, ctx.user_id).await?;
+
+    if mfa_service::verify_second_factor(&state.pool, &state.mfa_cipher, ctx.user_id, &req.code)
         .await?
         .is_none()
     {
+        mfa_throttle_service::record_failed_attempt(&state.redis, &state.alerts, ctx.user_id)
+            .await?;
+
         security_audit::mfa_failure(
             &state.pool,
             &state.redis,
@@ -148,6 +156,8 @@ pub async fn regenerate_backup_codes_handler(
 
         return Err(AppError::Unauthorized);
     }
+
+    mfa_throttle_service::clear_failed_attempts(&state.redis, ctx.user_id).await?;
 
     let backup_codes = mfa_service::regenerate_backup_codes(&state.pool, ctx.user_id).await?;
 
@@ -183,9 +193,15 @@ pub async fn verify_mfa_handler(
 ) -> Result<Json<ApiResponse<String>>, AppError> {
     req.validate()?;
 
-    let valid = mfa_service::verify_code(&state.pool, ctx.user_id, &req.code).await?;
+    // Per-account budget first: a locked account never reaches the TOTP maths.
+    mfa_throttle_service::check_mfa_allowed(&state.redis, ctx.user_id).await?;
+
+    let valid = mfa_service::verify_code(&state.pool, &state.mfa_cipher, ctx.user_id, &req.code).await?;
 
     if !valid {
+        mfa_throttle_service::record_failed_attempt(&state.redis, &state.alerts, ctx.user_id)
+            .await?;
+
         security_audit::mfa_failure(
             &state.pool,
             &state.redis,
@@ -202,6 +218,8 @@ pub async fn verify_mfa_handler(
 
         return Err(AppError::Unauthorized);
     }
+
+    mfa_throttle_service::clear_failed_attempts(&state.redis, ctx.user_id).await?;
 
     security_audit::mfa_success(
         &state.pool,
@@ -245,9 +263,16 @@ security_audit::token_purpose_violation(
         }
     };
 
-    let factor = mfa_service::verify_second_factor(&state.pool, claims.sub, &req.code).await?;
+    // The MFA token proves the password was right, so from here on the account
+    // is the target and the account is what we budget.
+    mfa_throttle_service::check_mfa_allowed(&state.redis, claims.sub).await?;
+
+    let factor = mfa_service::verify_second_factor(&state.pool, &state.mfa_cipher, claims.sub, &req.code).await?;
 
     let Some(factor) = factor else {
+        mfa_throttle_service::record_failed_attempt(&state.redis, &state.alerts, claims.sub)
+            .await?;
+
         security_audit::mfa_failure(
             &state.pool,
             &state.redis,
@@ -264,6 +289,8 @@ security_audit::token_purpose_violation(
 
         return Err(AppError::Unauthorized);
     };
+
+    mfa_throttle_service::clear_failed_attempts(&state.redis, claims.sub).await?;
 
     let user = UserRepository::find_by_id(&state.pool, claims.sub)
         .await?
@@ -340,9 +367,14 @@ pub async fn disable_mfa_handler(
 ) -> Result<Json<ApiResponse<String>>, AppError> {
     req.validate()?;
 
-    let disabled = mfa_service::disable_mfa(&state.pool, ctx.user_id, &req.code).await?;
+    mfa_throttle_service::check_mfa_allowed(&state.redis, ctx.user_id).await?;
+
+    let disabled = mfa_service::disable_mfa(&state.pool, &state.mfa_cipher, ctx.user_id, &req.code).await?;
 
     if !disabled {
+        mfa_throttle_service::record_failed_attempt(&state.redis, &state.alerts, ctx.user_id)
+            .await?;
+
         security_audit::mfa_failure(
             &state.pool,
             &state.redis,
@@ -359,6 +391,8 @@ pub async fn disable_mfa_handler(
 
         return Err(AppError::Unauthorized);
     }
+
+    mfa_throttle_service::clear_failed_attempts(&state.redis, ctx.user_id).await?;
 
     security_audit::mfa_success(
         &state.pool,

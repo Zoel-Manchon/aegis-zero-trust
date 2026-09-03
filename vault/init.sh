@@ -31,4 +31,14 @@ vault write database/roles/aegis-api \
     default_ttl="1h" \
     max_ttl="24h"
 
+# Transit: the KEK that wraps the per-seed data keys encrypting TOTP secrets.
+# The key never leaves Vault — the API sends a 32-byte data key and stores the
+# `vault:v1:` blob it gets back. Rotating this key re-wraps future enrolments;
+# revoking it makes every stored seed unreadable, on purpose.
+echo "[vault-init] enabling transit secrets engine"
+vault secrets enable transit 2>/dev/null || echo "[vault-init] transit engine already enabled"
+
+echo "[vault-init] creating transit key 'aegis-mfa'"
+vault write -f transit/keys/aegis-mfa >/dev/null 2>&1 || echo "[vault-init] transit key already exists"
+
 echo "[vault-init] done. Issue creds with:  vault read database/creds/aegis-api"

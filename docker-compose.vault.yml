@@ -61,6 +61,10 @@ services:
       VAULT_ADDR: http://vault:8200
       VAULT_TOKEN: root
       VAULT_DB_ROLE: aegis-api
+      # TOTP seeds: wrap each per-seed data key with Vault's transit engine, so
+      # the key material never reaches the API process or the database.
+      MFA_KEY_WRAPPER: vault
+      MFA_TRANSIT_KEY: aegis-mfa
       DB_HOST: db
       DB_PORT: "5432"
       DB_NAME: aegis

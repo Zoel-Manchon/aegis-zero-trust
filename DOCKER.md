@@ -53,6 +53,21 @@ docker compose exec vault sh -c 'VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=ro
 docker compose exec db psql -U aegis -d aegis -c '\du' | grep v-token
 ```
 
+`vault-init` also enables the **transit** engine and creates the `aegis-mfa`
+key, which wraps the per-seed data keys that encrypt TOTP secrets at rest. With
+the overlay the API runs with `MFA_KEY_WRAPPER=vault`, so the key material never
+reaches the API process or the database — Vault only ever sees a 32-byte data
+key. Watch a wrap happen while enrolling a device:
+
+```bash
+docker compose exec vault sh -c 'VAULT_ADDR=http://127.0.0.1:8200 VAULT_TOKEN=root vault read transit/keys/aegis-mfa'
+docker compose exec db psql -U aegis -d aegis -c 'SELECT user_id, left(secret, 24) FROM user_mfa'
+```
+
+The second command is the point: what is in the column is `aegis.v1....`, not a
+base32 seed. Without the overlay the base stack falls back to `MFA_KEK`, a known
+development key set in `docker-compose.yml` — same envelope, weaker custody.
+
 Dev-mode Vault is in-memory with a known root token: a lab demonstration, not a
 production posture. Credentials are fetched once at container start (1h lease);
 a real deployment would renew the lease in-process.
@@ -150,3 +165,9 @@ docker compose exec db psql -U aegis -d aegis -c '\dt'
 
 Rotate `REFRESH_SECRET` and the Postgres password in `docker-compose.yml`, and
 set `DB_SSL_MODE` to `require`/`verify-full` with a real certificate.
+
+Replace `MFA_KEK` too, or better, run with the Vault overlay so the KEK lives in
+transit instead of an environment variable. Generate one with
+`openssl rand -base64 32`. If neither is configured the API still boots, logs a
+warning, and stores TOTP seeds in plaintext — the pre-existing behaviour, made
+explicit rather than silent.

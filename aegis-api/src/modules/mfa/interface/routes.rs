@@ -26,8 +26,10 @@ pub fn mfa_routes(state: AppState) -> Router<AppState> {
     Router::new()
         .route("/mfa/complete-login", post(complete_mfa_login_handler))
         .merge(protected)
-        // Zero Trust note: MFA endpoints are high-value brute-force targets.
-        // Keep a coarse per-IP limiter here, and add a stricter user/token-scoped
-        // MFA limiter in mfa_service before production.
+        // Zero Trust note: MFA endpoints are high-value brute-force targets, so
+        // they get two limiters. This one is the coarse per-IP edge filter on
+        // request volume; the per-account failure budget lives in
+        // mfa_throttle_service and is spent inside every handler that takes a
+        // code, which is what survives an attacker rotating addresses.
         .route_layer(from_fn_with_state(state, rate_limit_middleware))
 }

@@ -4,16 +4,22 @@
 // HARDENING STATUS
 //   [x] backup/recovery codes, Argon2id-hashed at rest, single use
 //   [x] last-used timestep stored, so a code cannot be replayed in its window
-//   [ ] encrypted-at-rest TOTP secrets (Vault/KMS envelope encryption)
-//   [ ] per-user MFA attempt throttling beyond the per-IP limiter
+//   [x] encrypted-at-rest TOTP seeds — AES-256-GCM under a per-seed data key,
+//       the key wrapped by Vault transit or a local KEK (core::crypto::mfa_cipher)
+//   [x] per-user MFA attempt throttling on top of the per-IP limiter
+//       (mfa_throttle_service, wired in every handler that takes a code)
 //   [x] WebAuthn/passkeys for phishing-resistant MFA (see modules::passkeys)
 //
-// The two open items are tracked in the README's security section. Both are
-// deliberate: they need infrastructure decisions, not just code.
+// The seed never leaves this module in its stored form: the repository holds an
+// envelope, and every path that needs the raw base32 opens it first.
 // =============================================================================
 
 use crate::{
-    core::{errors::app_error::AppError, security::hash_password::{hash_password, verify_password}},
+    core::{
+        crypto::mfa_cipher::MfaCipher,
+        errors::app_error::AppError,
+        security::hash_password::{hash_password, verify_password},
+    },
     modules::mfa::infrastructure::repositories::mfa_repository,
 };
 
@@ -41,8 +47,13 @@ pub enum SecondFactor {
     BackupCode,
 }
 
+/// Start (or resume) enrolment.
+///
+/// The plaintext seed is returned to the caller exactly here — the user needs
+/// it to scan the QR — but what reaches the database is the sealed envelope.
 pub async fn setup_mfa(
     pool: &sqlx::PgPool,
+    cipher: &MfaCipher,
     user_id: i64,
     user_email: &str,
 ) -> Result<MfaSetup, AppError> {
@@ -51,24 +62,22 @@ pub async fn setup_mfa(
             return Err(AppError::Conflict);
         }
 
-        let otpauth_url = build_totp(&existing.secret, user_email)?.get_url();
+        // Resuming an abandoned enrolment: reopen the stored envelope rather
+        // than minting a second seed, so a half-scanned QR still works.
+        let secret = cipher.open(&existing.secret).await?;
+        let otpauth_url = build_totp(&secret, user_email)?.get_url();
 
-        return Ok(MfaSetup {
-            secret: existing.secret,
-            otpauth_url,
-        });
+        return Ok(MfaSetup { secret, otpauth_url });
     }
 
     let secret = generate_base32_secret();
+    let sealed = cipher.seal(&secret).await?;
 
-    let row = mfa_repository::create_mfa_secret(pool, user_id, &secret).await?;
+    mfa_repository::create_mfa_secret(pool, user_id, &sealed).await?;
 
-    let otpauth_url = build_totp(&row.secret, user_email)?.get_url();
+    let otpauth_url = build_totp(&secret, user_email)?.get_url();
 
-    Ok(MfaSetup {
-        secret: row.secret,
-        otpauth_url,
-    })
+    Ok(MfaSetup { secret, otpauth_url })
 }
 
 /// Confirm enrollment and mint the first set of backup codes.
@@ -78,6 +87,7 @@ pub async fn setup_mfa(
 /// them — the same contract every serious IdP uses.
 pub async fn verify_setup(
     pool: &sqlx::PgPool,
+    cipher: &MfaCipher,
     user_id: i64,
     code: &str,
 ) -> Result<Option<Vec<String>>, AppError> {
@@ -89,7 +99,9 @@ pub async fn verify_setup(
         return Err(AppError::Conflict);
     }
 
-    let Some(step) = matching_step(&mfa.secret, code) else {
+    let secret = cipher.open(&mfa.secret).await?;
+
+    let Some(step) = matching_step(&secret, code) else {
         return Ok(None);
     };
 
@@ -109,7 +121,12 @@ pub async fn verify_setup(
 /// enough: the same code stays valid for the rest of its step. We resolve the
 /// exact step the code belongs to and claim it atomically, so a code works
 /// once and only once.
-pub async fn verify_code(pool: &sqlx::PgPool, user_id: i64, code: &str) -> Result<bool, AppError> {
+pub async fn verify_code(
+    pool: &sqlx::PgPool,
+    cipher: &MfaCipher,
+    user_id: i64,
+    code: &str,
+) -> Result<bool, AppError> {
     let mfa = mfa_repository::find_by_user_id(pool, user_id)
         .await?
         .ok_or(AppError::Unauthorized)?;
@@ -118,7 +135,9 @@ pub async fn verify_code(pool: &sqlx::PgPool, user_id: i64, code: &str) -> Resul
         return Err(AppError::Unauthorized);
     }
 
-    let Some(step) = matching_step(&mfa.secret, code) else {
+    let secret = cipher.open(&mfa.secret).await?;
+
+    let Some(step) = matching_step(&secret, code) else {
         return Ok(false);
     };
 
@@ -135,10 +154,11 @@ pub async fn verify_code(pool: &sqlx::PgPool, user_id: i64, code: &str) -> Resul
 /// slow and we only pay for it on actual recovery.
 pub async fn verify_second_factor(
     pool: &sqlx::PgPool,
+    cipher: &MfaCipher,
     user_id: i64,
     code: &str,
 ) -> Result<Option<SecondFactor>, AppError> {
-    if code.len() == 6 && verify_code(pool, user_id, code).await? {
+    if code.len() == 6 && verify_code(pool, cipher, user_id, code).await? {
         return Ok(Some(SecondFactor::Totp));
     }
 
@@ -197,8 +217,13 @@ pub async fn remaining_backup_codes(pool: &sqlx::PgPool, user_id: i64) -> Result
 
 /// Disabling MFA also destroys the backup codes: a printout from a previous
 /// enrollment must never unlock a re-enrolled account.
-pub async fn disable_mfa(pool: &sqlx::PgPool, user_id: i64, code: &str) -> Result<bool, AppError> {
-    if verify_second_factor(pool, user_id, code).await?.is_none() {
+pub async fn disable_mfa(
+    pool: &sqlx::PgPool,
+    cipher: &MfaCipher,
+    user_id: i64,
+    code: &str,
+) -> Result<bool, AppError> {
+    if verify_second_factor(pool, cipher, user_id, code).await?.is_none() {
         return Ok(false);
     }
 

@@ -29,6 +29,7 @@ argon2 = "0.5.3"
 jsonwebtoken = { version = "10.3.0", features = ["rust_crypto"] }
 webauthn-rs = { version = "0.5.5", features = ["danger-allow-state-serialisation"] }
 totp-rs = { version = "5.7", features = ["otpauth"] }
+aes-gcm = "0.10.3"                                  # envelope encryption for TOTP seeds at rest
 sha2 = "0.11.0"
 hmac = "0.13.0"
 subtle = "2.6.1"
