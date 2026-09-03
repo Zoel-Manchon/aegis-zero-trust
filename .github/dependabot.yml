@@ -1,0 +1,8 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /aegis-api
+    schedule: { interval: weekly }
+  - package-ecosystem: npm
+    directory: /aegis-console
+    schedule: { interval: weekly }
