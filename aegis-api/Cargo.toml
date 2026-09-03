@@ -33,7 +33,7 @@ aes-gcm = "0.10.3"                                  # envelope encryption for TO
 sha2 = "0.11.0"
 hmac = "0.13.0"
 subtle = "2.6.1"
-rand = { version = "0.8.6", features = ["std"] }   # >= 0.8.6 fixes RUSTSEC-2026-0097
+rand = { version = "0.8.6", features = ["std"] }   # >= 0.10.2 fixes RUSTSEC-2026-0097
 
 # --- encoding / serde -------------------------------------------------------
 serde = { version = "1.0.229", features = ["derive"] }
