@@ -41,7 +41,7 @@ serde_json = "1.0.151"
 base64 = "0.22.1"
 data-encoding = "2.11"
 hex = "0.4.3"
-validator = { version = "0.20.0", features = ["derive"] }
+validator = { version = "0.21.0", features = ["derive"] }
 
 # --- misc -------------------------------------------------------------------
 chrono = { version = "0.4.45", features = ["serde"] }
