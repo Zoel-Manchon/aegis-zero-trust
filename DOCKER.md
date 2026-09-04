@@ -147,6 +147,15 @@ A fresh clone runs as-is. Regenerate these only if you change the schema or a
 **1. Schema - `docker/db-init/01_schema.sql`.** There is no auto-migrator; the DB
 container loads this on first boot.
 
+> **A migration is not finished until this dump is regenerated.** The dump is
+> what a fresh database gets; the files under `aegis-api/src/**/migration/` are
+> what an existing one gets. Nothing enforces that the two agree, so when they
+> drift, every `down -v` and every fresh clone produces a database the API
+> cannot run against — with an error that names a column, not the cause:
+> `column "last_used_step" does not exist`. Run `bash scripts/check-schema.sh`
+> after adding a migration; it builds a scratch database from the init files,
+> applies every migration on top, and fails if anything changed.
+
 ```bash
 PGPASSWORD=... pg_dump -h localhost -p 5432 -U <user> -d <db> \
   --schema-only --no-owner --no-privileges > docker/db-init/01_schema.sql
@@ -229,6 +238,7 @@ second invalidates every access token ever issued.
 | `SQLX_OFFLINE=true but there is no cached data for this query` | The SQL text of that macro changed after the last `cargo sqlx prepare`. The cache is keyed by SHA-256 of the query string, so even a whitespace edit orphans the old entry. Regenerate as above. |
 | `cargo sqlx prepare`: *no driver found for URL scheme* | Reinstall sqlx-cli with `--features rustls,postgres --force`, and use the `postgres://` scheme, not `postgresql://`. |
 | DB init: *unrecognized configuration parameter "transaction_timeout"* | Dump is from a newer Postgres than the container - match the `postgres:NN` tag. |
+| API returns 500 on login, log says `column "..." does not exist` | `docker/db-init/01_schema.sql` is behind the migrations, so a freshly initialised database is missing what the API expects. Apply the missing migration from `aegis-api/src/**/migration/`, then regenerate the dump (above) and verify with `bash scripts/check-schema.sh`. |
 | Runtime/seed: *relation "users" does not exist* | `01_schema.sql` missing or empty -> drop only the DB volume: `docker compose down && docker volume rm aegis_db-data && docker compose up -d --build`. |
 | Firefox: **`SEC_ERROR_BAD_SIGNATURE`** at `https://localhost` (Chrome: `ERR_CERT_AUTHORITY_INVALID`) | `docker compose down -v` deleted `aegis_caddy_data`, so Caddy minted a **new** internal CA. Its subject name is identical to the old one, so the browser picks the CA it already trusts and fails to verify a signature made by a different key — hence *bad signature* rather than *unknown issuer*. Delete the old **Caddy Local Authority** from the browser and import the new root: see [Trusting Caddy's certificate](#trusting-caddys-certificate). |
 | `seed` fails: *network not found* | Use `docker compose --profile seed run --rm seed` (one-off), not `up seed`. |

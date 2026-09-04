@@ -82,7 +82,11 @@ pub async fn record_failed_attempt(
         .await
         .map_err(|_| AppError::InternalError)?;
 
-    if count > MAX_ATTEMPTS_PER_USER {
+    // `>=`, not `>`: the check runs at the start of a request, so the attempt
+    // that spends the budget is already being evaluated when this fires. With
+    // `>` the lock would only bite on the attempt *after* that, handing an
+    // attacker one more guess than MAX_ATTEMPTS_PER_USER advertises.
+    if count >= MAX_ATTEMPTS_PER_USER {
         redis
             .set_ex(&lock_key(user_id), "1", LOCKOUT_SECONDS)
             .await

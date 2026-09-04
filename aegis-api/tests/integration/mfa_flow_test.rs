@@ -47,6 +47,8 @@ async fn repeated_wrong_codes_lock_the_account() -> anyhow::Result<()> {
         .expect("mfa token missing")
         .to_string();
 
+    // Five failures spend the budget; the fifth is the one that arms the lock,
+    // so the sixth attempt is the first to be refused outright.
     let mut last_status = StatusCode::OK;
     for attempt in 0..6 {
         let (status, _body) = post_json(

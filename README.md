@@ -292,6 +292,7 @@ aegis/
 │  ├─ web.Dockerfile         # build console → serve via Caddy
 │  ├─ db-init/01_schema.sql  # committed schema (loaded on first DB boot)
 │  └─ seed/seed.sh           # demo account seeder
+├─ scripts/check-schema.sh   # fails if the schema dump is behind the migrations
 ├─ docker-compose.yml
 ├─ docker-compose.vault.yml  # optional: Vault dynamic DB credentials
 ├─ vault/init.sh             # Vault database-engine config

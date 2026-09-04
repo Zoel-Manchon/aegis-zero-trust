@@ -2,10 +2,10 @@
 -- PostgreSQL database dump
 --
 
-\restrict ZZCsrzWCC9miR9ztQ42T5F9bWWLgbQxfU2EUFDrxUqMOrMPGIFraOYUIKC3JbJ0
+\restrict L9gAvYHEe9an2w9N8jy4m2z8E8X9sdigbTEG8vZbaaddshpqmgl2hKir6NAg4Ua
 
--- Dumped from database version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
--- Dumped by pg_dump version 18.4 (Ubuntu 18.4-1.pgdg26.04+1)
+-- Dumped from database version 17.11 (Debian 17.11-1.pgdg13+2)
+-- Dumped by pg_dump version 17.11 (Debian 17.11-1.pgdg13+2)
 
 SET statement_timeout = 0;
 SET lock_timeout = 0;
@@ -18,13 +18,6 @@ SET check_function_bodies = false;
 SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
-
---
--- Name: public; Type: SCHEMA; Schema: -; Owner: -
---
-
--- *not* creating schema, since initdb creates it
-
 
 --
 -- Name: SCHEMA public; Type: COMMENT; Schema: -; Owner: -
@@ -66,6 +59,20 @@ CREATE TYPE public.user_role AS ENUM (
     'user',
     'admin'
 );
+
+
+--
+-- Name: soc_notify_security_event(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.soc_notify_security_event() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+BEGIN
+    PERFORM pg_notify('soc_events', row_to_json(NEW)::text);
+    RETURN NEW;
+END;
+$$;
 
 
 SET default_tablespace = '';
@@ -212,8 +219,23 @@ CREATE TABLE public.user_mfa (
     enabled boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     verified_at timestamp with time zone,
-    disabled_at timestamp with time zone
+    disabled_at timestamp with time zone,
+    last_used_step bigint
 );
+
+
+--
+-- Name: COLUMN user_mfa.secret; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.user_mfa.secret IS 'TOTP seed. Sealed rows carry the aegis.v1.<wrapped DEK>.<nonce>.<ciphertext> envelope (AES-256-GCM, key wrapped by Vault transit or a local KEK). Rows without that prefix are legacy plaintext seeds and are read as-is until re-enrolment.';
+
+
+--
+-- Name: COLUMN user_mfa.last_used_step; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.user_mfa.last_used_step IS 'Highest TOTP step consumed; codes from this step or earlier are rejected as replays.';
 
 
 --
@@ -517,6 +539,13 @@ CREATE UNIQUE INDEX users_lower_email_unique_idx ON public.users USING btree (lo
 
 
 --
+-- Name: security_events trg_soc_notify_security_event; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_soc_notify_security_event AFTER INSERT ON public.security_events FOR EACH ROW EXECUTE FUNCTION public.soc_notify_security_event();
+
+
+--
 -- Name: email_verification_tokens email_verification_tokens_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -576,5 +605,5 @@ ALTER TABLE ONLY public.user_mfa
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ZZCsrzWCC9miR9ztQ42T5F9bWWLgbQxfU2EUFDrxUqMOrMPGIFraOYUIKC3JbJ0
+\unrestrict L9gAvYHEe9an2w9N8jy4m2z8E8X9sdigbTEG8vZbaaddshpqmgl2hKir6NAg4Ua
 

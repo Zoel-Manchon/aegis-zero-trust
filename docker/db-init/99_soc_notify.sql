@@ -8,13 +8,16 @@ BEGIN
         RETURN;
     END IF;
 
+    -- The body must match 0007_soc_event_notify.sql byte for byte. Postgres
+    -- stores the source verbatim, so a difference in indentation alone shows
+    -- up as a schema difference and hides the next real one behind it.
     CREATE OR REPLACE FUNCTION soc_notify_security_event() RETURNS trigger
     LANGUAGE plpgsql AS $fn$
-    BEGIN
-        PERFORM pg_notify('soc_events', row_to_json(NEW)::text);
-        RETURN NEW;
-    END;
-    $fn$;
+BEGIN
+    PERFORM pg_notify('soc_events', row_to_json(NEW)::text);
+    RETURN NEW;
+END;
+$fn$;
 
     DROP TRIGGER IF EXISTS trg_soc_notify_security_event ON security_events;
     CREATE TRIGGER trg_soc_notify_security_event
