@@ -72,6 +72,59 @@ Dev-mode Vault is in-memory with a known root token: a lab demonstration, not a
 production posture. Credentials are fetched once at container start (1h lease);
 a real deployment would renew the lease in-process.
 
+## Resetting the stack
+
+A reset has two halves, and doing only the first is why a "clean" environment
+still behaves as if it remembers something.
+
+### Server side
+
+```bash
+docker compose down
+docker volume rm aegis_db-data aegis_api-keys
+docker compose up -d --build --force-recreate
+docker compose --profile seed run --rm seed
+```
+
+`aegis_db-data` is the database; `aegis_api-keys` is the JWT keypair, so
+dropping it invalidates every token ever issued — which is what you want from a
+reset, and worth knowing before you wonder why an old token stopped working.
+
+**Leave `aegis_caddy_data` alone.** That is the internal CA. Keeping it means
+the certificate you imported into your browser stays valid; dropping it means
+importing a new one and first deleting the old, or the browser fails with
+`SEC_ERROR_BAD_SIGNATURE` — see below. `docker compose down -v` drops all four
+without asking, which is why it is not the reset command here.
+
+### Browser side
+
+The database no longer has your session, but the browser still holds the
+refresh token that pointed at it. Open `https://localhost`, then DevTools
+(<kbd>F12</kbd>) → Console, and paste
+[`scripts/reset-browser-state.js`](./scripts/reset-browser-state.js). It clears
+sessionStorage (`zt.rt`, `zt.jti`), localStorage, cookies, IndexedDB, Cache
+Storage and service workers for the origin, reports what it removed, and
+reloads.
+
+Three things no page script can reach, by design — clear them by hand if you
+need to:
+
+| What | Where |
+| --- | --- |
+| The imported Caddy CA | Firefox → Settings → Privacy & Security → Certificates → *View Certificates* → **Authorities** |
+| The HSTS entry for `localhost` | History sidebar → right-click `localhost` → **Forget About This Site** |
+| Passkeys | The platform authenticator that created them (Windows Hello, Touch ID, security key) — or the DevTools virtual authenticator panel |
+
+### After a reset
+
+`admin@test.com` starts with **no MFA enrolled**, so the first sign-in goes
+straight in and the console prompts you to enrol. If it asks for a six-digit
+code instead, an enrolment survived: check with
+
+```bash
+docker compose exec -T db psql -U aegis -d aegis -c 'select user_id, enabled from user_mfa'
+```
+
 ## Trusting Caddy's certificate
 
 Caddy serves `https://localhost` with a certificate from **its own internal
