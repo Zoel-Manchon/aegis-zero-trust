@@ -84,11 +84,17 @@ the root and import that file:
 
 ```bash
 # Export whatever CA the running Caddy actually has right now
-docker compose exec -T web cat /data/caddy/pki/authorities/local/root.crt > caddy-root.crt
+docker compose cp web:/data/caddy/pki/authorities/local/root.crt caddy-root.crt
 
 # Confirm which one you are looking at
 openssl x509 -in caddy-root.crt -noout -subject -dates -fingerprint -sha256
 ```
+
+> Use `docker compose cp`, not `docker compose exec ... > file`. PowerShell's
+> `>` writes UTF-16 with a BOM, which produces a file that still *looks* like a
+> PEM in an editor but makes OpenSSL fail with
+> `No supported data to decode. Input structure: Certificate`. `cp` copies
+> bytes and behaves the same in PowerShell, cmd and bash.
 
 Then import `caddy-root.crt`:
 

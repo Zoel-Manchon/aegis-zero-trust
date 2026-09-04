@@ -1,10 +1,10 @@
 # Aegis
 
-**Aegis — Zero-Trust Auth Lab & Attack Range.** A zero-trust identity provider with a built-in Security Operations Console (SOC).
-The backend authenticates users, re-verifies every request, scores risk in real
-time, and writes every security-relevant event into a tamper-evident audit log.
-The admin console visualizes that telemetry live and lets you launch attacks
-against the system to watch the defenses — and the detections — fire.
+**Zero-trust auth lab and attack range.**
+
+Every request is re-verified, scored for risk, and written to a tamper-evident
+audit log. A Security Operations Console watches that telemetry live — and a
+built-in attack range lets you fire at the system and see the detections trip.
 
 https://github.com/user-attachments/assets/db154dab-3684-4ee1-919d-70c0405ac1c4
 
@@ -15,7 +15,130 @@ https://github.com/user-attachments/assets/db154dab-3684-4ee1-919d-70c0405ac1c4
 
 ---
 
-## Features
+## At a glance
+
+|  |  |
+| --- | --- |
+| **Shape** | Identity provider + SOC console + attack range, in one Docker Compose stack. Real logins and simulated attacks share the same detection pipeline. |
+| **Topology** | One origin. Caddy terminates TLS, serves the console, and reverse-proxies `/api/*` to the API. No CORS, no second port. |
+| **Backend** | Rust · axum 0.8 · sqlx · PostgreSQL 17 · Redis 7 |
+| **Frontend** | React 19 · Vite · React Router 7 · Tailwind v4 · Recharts |
+| **Identity** | Argon2id passwords · TOTP MFA (encrypted at rest) · WebAuthn passkeys · RS256 JWTs with refresh rotation and replay detection |
+| **Defence** | Per-request risk score · GeoIP impossible-travel · hash-chained audit log · live SOC feed over SSE + WebSocket |
+| **Run it** | `docker compose up -d --build` → **https://localhost** |
+| **Read next** | [`DOCKER.md`](./DOCKER.md) for build, Vault, certificates and troubleshooting |
+
+**Contents** — [Architecture](#architecture) · [Quick start](#quick-start) ·
+[What it does](#what-it-does) · [Data model](#data-model) ·
+[Passkeys](#passkeys-webauthn) · [Repository layout](#repository-layout) ·
+[Security notes](#security-notes) · [Roadmap](#roadmap)
+
+---
+
+## Architecture
+
+Four containers behind one origin. The browser only ever talks to Caddy.
+
+```mermaid
+flowchart LR
+    U([Browser]) -->|single origin · https://localhost| CADDY[Caddy<br/>reverse proxy · TLS]
+    CADDY -->|/ static| WEB[React + Vite console]
+    CADDY -->|/api/* → strip prefix → :3000| API[Rust / axum API]
+    API --> PG[(PostgreSQL 17)]
+    API --> REDIS[(Redis)]
+```
+
+| Container | Role | Port |
+| --- | --- | --- |
+| `web` | Caddy: TLS, static console, reverse proxy | 443 (80 redirects) |
+| `api` | Rust/axum API — auth, risk, audit, SOC endpoints | 3000, internal only |
+| `db` | PostgreSQL 17 — users, sessions, audit chain | internal only |
+| `redis` | Sessions, rate limits, WebAuthn ceremony state | internal only |
+| `vault` | *Optional overlay*: dynamic DB credentials + MFA key wrapping | 8200 |
+
+### Why a single origin
+
+Caddy is the only entry point (`docker/Caddyfile`): it serves the static console
+and reverse-proxies `/api/*` to the API, stripping the prefix. One origin means
+SSE, WebSockets and the real client IP (`X-Forwarded-For`, which GeoIP depends
+on) all work without CORS gymnastics.
+
+**TLS is on by default** via `tls internal`, Caddy's built-in CA — port 80 only
+redirects, nothing is served in cleartext. A zero-trust demo served over HTTP
+would undercut its own premise, and the `localhost` secure-context exemption
+hides the class of bug that appears the moment this runs anywhere else. Trusting
+that CA in your browser is a one-time step: see
+[Trusting Caddy's certificate](./DOCKER.md#trusting-caddys-certificate).
+
+### How a request works
+
+1. **Caddy** terminates TLS and forwards `/api/*` to the API with the real
+   client IP in `X-Forwarded-For` — GeoIP depends on it.
+2. **Auth middleware** validates the RS256 JWT, checks the session is still
+   live, and rejects a revoked `jti`. Every request is re-verified; nothing is
+   trusted because it was trusted a minute ago.
+3. **The risk engine** scores the request 0–100 from IP churn, device
+   fingerprint, login velocity and session lineage, then policy decides:
+   allow, step up to MFA, or deny.
+4. **Every security-relevant event** is appended to `security_events`, each row
+   hashed against the previous one, so tampering with history is detectable.
+5. **The insert fires `pg_notify`**, which the SSE endpoint relays to the
+   console — that is the live feed. Critical events also go out over WebSocket
+   as a popup with a chime.
+
+The API is a DDD-layered axum service — domain / application / infrastructure /
+interface per module: `auth`, `mfa`, `passkeys`, `risk`, `audit`, `geo`,
+`attack_range`, and `admin` (the SOC endpoints).
+
+### Runtime flow (red → blue)
+
+Attacks and real logins enter the same pipeline, which is the point: the console
+cannot tell them apart, so neither can a detection that only works on drills.
+
+```mermaid
+flowchart TD
+    AR[Attack Range<br/>origin + scenario] --> EV
+    LOGIN[Real login from an IP] --> GEO[GeoIP lookup<br/>+ impossible-travel check]
+    GEO --> EV[security_events<br/>hash-chained audit]
+    AR --> GEO
+    EV -->|pg_notify soc_events| SSE[SSE /admin/security/events/stream]
+    GEO -->|critical| DISP[Alert dispatcher]
+    AR -->|scenario alert| DISP
+    DISP -->|broadcast bus| WS[WS /admin/security/alerts/ws]
+    SSE --> FEED[SOC: live feed + map]
+    WS --> POP[Popup + chime]
+```
+
+---
+
+## Quick start
+
+The repo ships the schema (`docker/db-init/01_schema.sql`) and the sqlx offline
+cache (`aegis-api/.sqlx`), so a clone builds and runs as-is:
+
+```bash
+docker compose up -d --build           # Postgres + Redis + API + Caddy(web)
+docker compose --profile seed run --rm seed  # seed admin@test.com / victim@test.com
+# open https://localhost
+```
+
+Optionally run with **Vault**-issued dynamic, short-lived DB credentials instead
+of the static password:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.vault.yml up -d --build
+```
+
+Then: sign in as **admin@test.com / AdminPass123!** → you'll hit the **MFA gate**
+→ enroll a TOTP app → sign in again → open **Attack Range**, target
+`victim@test.com`, and launch from two distant origins to trip impossible-travel.
+
+Full details, regenerating the schema/`.sqlx`, troubleshooting and the HTTPS
+option are in [`DOCKER.md`](./DOCKER.md).
+
+---
+
+## What it does
 
 **Identity & access**
 - JWT (RS256) access tokens with `jti`, session binding, and **refresh-token
@@ -52,40 +175,7 @@ https://github.com/user-attachments/assets/db154dab-3684-4ee1-919d-70c0405ac1c4
 
 ---
 
-## Architecture
-
-```mermaid
-flowchart LR
-    U([Browser]) -->|single origin · https://localhost| CADDY[Caddy<br/>reverse proxy · TLS]
-    CADDY -->|/ static| WEB[React + Vite console]
-    CADDY -->|/api/* → strip prefix → :3000| API[Rust / axum API]
-    API --> PG[(PostgreSQL 17)]
-    API --> REDIS[(Redis)]
-```
-
-The API is a DDD-layered axum service (domain / application / infrastructure /
-interface per module): `auth`, `mfa`, `passkeys`, `risk`, `audit`, `geo`,
-`attack_range`, and `admin` (the SOC endpoints).
-
-### Runtime flow (red → blue)
-
-```mermaid
-flowchart TD
-    AR[Attack Range<br/>origin + scenario] --> EV
-    LOGIN[Real login from an IP] --> GEO[GeoIP lookup<br/>+ impossible-travel check]
-    GEO --> EV[security_events<br/>hash-chained audit]
-    AR --> GEO
-    EV -->|pg_notify soc_events| SSE[SSE /admin/security/events/stream]
-    GEO -->|critical| DISP[Alert dispatcher]
-    AR -->|scenario alert| DISP
-    DISP -->|broadcast bus| WS[WS /admin/security/alerts/ws]
-    SSE --> FEED[SOC: live feed + map]
-    WS --> POP[Popup + chime]
-```
-
----
-
-## Database schema
+## Data model
 
 The schema is committed at **`docker/db-init/01_schema.sql`** (loaded automatically
 by Postgres on first boot). Incremental migrations live in
@@ -136,54 +226,6 @@ erDiagram
 
 A row inserted into `security_events` fires `pg_notify('soc_events', ...)`, which
 the SSE endpoint relays to the dashboard — that's the real-time feed.
-
----
-
-## Tech stack
-
-| Layer | Tech |
-| --- | --- |
-| Backend | Rust, axum 0.8, sqlx (Postgres), Redis, argon2, jsonwebtoken (RS256), totp-rs |
-| Frontend | React 19, Vite, React Router 7, Tailwind v4, Recharts |
-| Data | PostgreSQL 17, Redis 7 |
-| Delivery | Docker Compose, **Caddy** (single-origin reverse proxy / TLS-capable) |
-
----
-
-## Quick start (Docker)
-
-The repo ships the schema (`docker/db-init/01_schema.sql`) and the sqlx offline
-cache (`aegis-api/.sqlx`), so a clone builds and runs as-is:
-
-```bash
-docker compose up -d --build           # Postgres + Redis + API + Caddy(web)
-docker compose --profile seed run --rm seed  # seed admin@test.com / victim@test.com
-# open https://localhost
-```
-
-Optionally run with **Vault**-issued dynamic, short-lived DB credentials instead
-of the static password:
-
-```bash
-docker compose -f docker-compose.yml -f docker-compose.vault.yml up -d --build
-```
-
-Then: sign in as **admin@test.com / AdminPass123!** → you'll hit the **MFA gate**
-→ enroll a TOTP app → sign in again → open **Attack Range**, target
-`victim@test.com`, and launch from two distant origins to trip impossible-travel.
-
-Full details, regenerating the schema/`.sqlx`, troubleshooting and the HTTPS
-option are in [`DOCKER.md`](./DOCKER.md).
-
-### Reverse proxy
-
-Caddy is the single entry point (`docker/Caddyfile`): it serves the static
-console and reverse-proxies `/api/*` to the API (stripping the prefix). One
-origin means SSE, WebSocket, and the real client IP (`X-Forwarded-For`, used by
-GeoIP) all work without CORS gymnastics. **TLS is on by default** via `tls
-internal` (Caddy's built-in CA) — port 80 only redirects, nothing is served in
-cleartext. A zero-trust demo over HTTP would undercut its own premise, and the
-`localhost` secure-context exemption hides bugs that appear anywhere else.
 
 ---
 
@@ -270,10 +312,17 @@ aegis/
   `require` / `verify-full` with a real certificate for production.
 - `.env` files and `*.pem` keys are git-ignored. If any secret was ever committed
   to history, rotate it and purge it (`git filter-repo`).
-- **Known gaps, stated plainly:** TOTP secrets are stored unencrypted (anyone
-  with DB read access can generate valid codes), and MFA attempts are throttled
-  per-IP rather than per-user. Both are tracked in the roadmap. A zero-trust lab
-  that hid its own open edges would be teaching the wrong lesson.
+- **TOTP seeds are encrypted at rest** with envelope encryption — a per-seed
+  AES-256-GCM data key, wrapped by Vault's transit engine or a local KEK. Set
+  `MFA_KEY_WRAPPER=vault` or `MFA_KEK`; with neither, the API boots, warns
+  loudly, and stores them in the clear.
+- **MFA attempts are budgeted per account**, not only per IP, so an attacker
+  rotating source addresses buys no extra guesses at the six digits. Tripping
+  the budget fires a Critical SOC alert naming the account.
+- **Still open, stated plainly:** the demo Vault runs in dev mode with a known
+  root token and in-memory storage, and the DB credentials in the compose file
+  are static unless you run the Vault overlay. A zero-trust lab that hid its own
+  open edges would be teaching the wrong lesson.
 
 ---
 
