@@ -72,6 +72,67 @@ Dev-mode Vault is in-memory with a known root token: a lab demonstration, not a
 production posture. Credentials are fetched once at container start (1h lease);
 a real deployment would renew the lease in-process.
 
+## Trusting Caddy's certificate
+
+Caddy serves `https://localhost` with a certificate from **its own internal
+CA**, which lives in the `aegis_caddy_data` volume. `caddy-root.crt` in the
+repository root is a copy of that CA as it stood when it was committed.
+
+`docker compose exec web caddy trust` installs it into the **container's** trust
+store, which is not where your browser looks. To trust it on the host, export
+the root and import that file:
+
+```bash
+# Export whatever CA the running Caddy actually has right now
+docker compose exec -T web cat /data/caddy/pki/authorities/local/root.crt > caddy-root.crt
+
+# Confirm which one you are looking at
+openssl x509 -in caddy-root.crt -noout -subject -dates -fingerprint -sha256
+```
+
+Then import `caddy-root.crt`:
+
+- **Firefox** - Settings > Privacy & Security > Certificates > *View
+  Certificates* > **Authorities** > Import > tick *Trust this CA to identify
+  websites*. Firefox keeps its own store; adding the CA to Windows does nothing
+  for it.
+- **Chrome / Edge / Windows** - `certutil -addstore -user Root caddy-root.crt`,
+  or Manage Computer Certificates > Trusted Root Certification Authorities.
+
+### When the CA is regenerated
+
+Deleting `aegis_caddy_data` - which is what `docker compose down -v` does -
+makes Caddy mint a **new** CA on the next boot. The new one carries the *same
+subject name* as the old, because the name only encodes the year:
+
+```text
+CN=Caddy Local Authority - 2026 ECC Root
+```
+
+So a browser that still trusts the old CA finds it by name, tries to verify the
+new certificate's signature with the old public key, and fails. Firefox reports
+this as **`SEC_ERROR_BAD_SIGNATURE`** - *bad signature*, not *unknown issuer*,
+which is the tell that a stale CA with a colliding name is in the way rather
+than none at all.
+
+Recovering is two steps, and the order matters:
+
+1. **Delete the old authority first.** Firefox > *View Certificates* >
+   **Authorities** > *Caddy Local Authority* > **Delete or Distrust**. Importing
+   the new root without removing the old one leaves two CAs with the same
+   subject, and the failure can persist.
+2. Export and import the new root with the commands above.
+
+HSTS makes this non-optional. The Caddyfile sends
+`Strict-Transport-Security: max-age=31536000`, so once Firefox has seen it the
+*Advanced > Accept the Risk* escape hatch is no longer offered for `localhost` -
+the certificate has to actually validate. To clear that state, use **Forget
+About This Site** on `localhost` from the History sidebar (it also clears
+cookies and history for the origin).
+
+The cheapest fix, of course, is not regenerating the CA at all: keep
+`aegis_caddy_data` and drop only the volume you actually meant to reset.
+
 ## Two generated files (already committed)
 
 A fresh clone runs as-is. Regenerate these only if you change the schema or a
@@ -140,7 +201,19 @@ docker compose exec -it api admin_terminal                        # interactive 
 ## Troubleshooting
 
 The DB only runs `docker/db-init/*.sql` on a **fresh** volume. After a schema
-change: `docker compose down -v && docker compose up -d --build`.
+change, drop *that* volume and nothing else:
+
+```bash
+docker compose down
+docker volume rm aegis_db-data
+docker compose up -d --build
+```
+
+**Do not reach for `docker compose down -v`.** It takes every named volume with
+it, including `aegis_caddy_data` — which holds Caddy's internal CA — and
+`aegis_api-keys`, which holds the JWT keypair. Losing the first breaks HTTPS in
+a browser that trusted the old CA (see the certificate row below); losing the
+second invalidates every access token ever issued.
 
 | Symptom | Cause / fix |
 | --- | --- |
@@ -150,7 +223,8 @@ change: `docker compose down -v && docker compose up -d --build`.
 | `SQLX_OFFLINE=true but there is no cached data for this query` | The SQL text of that macro changed after the last `cargo sqlx prepare`. The cache is keyed by SHA-256 of the query string, so even a whitespace edit orphans the old entry. Regenerate as above. |
 | `cargo sqlx prepare`: *no driver found for URL scheme* | Reinstall sqlx-cli with `--features rustls,postgres --force`, and use the `postgres://` scheme, not `postgresql://`. |
 | DB init: *unrecognized configuration parameter "transaction_timeout"* | Dump is from a newer Postgres than the container - match the `postgres:NN` tag. |
-| Runtime/seed: *relation "users" does not exist* | `01_schema.sql` missing or empty -> `docker compose down -v && up -d --build`. |
+| Runtime/seed: *relation "users" does not exist* | `01_schema.sql` missing or empty -> drop only the DB volume: `docker compose down && docker volume rm aegis_db-data && docker compose up -d --build`. |
+| Firefox: **`SEC_ERROR_BAD_SIGNATURE`** at `https://localhost` (Chrome: `ERR_CERT_AUTHORITY_INVALID`) | `docker compose down -v` deleted `aegis_caddy_data`, so Caddy minted a **new** internal CA. Its subject name is identical to the old one, so the browser picks the CA it already trusts and fails to verify a signature made by a different key — hence *bad signature* rather than *unknown issuer*. Delete the old **Caddy Local Authority** from the browser and import the new root: see [Trusting Caddy's certificate](#trusting-caddys-certificate). |
 | `seed` fails: *network not found* | Use `docker compose --profile seed run --rm seed` (one-off), not `up seed`. |
 | Port 8080 in use | Change `8080:80` under the `web` service. |
 | `--mount=type=cache` parse error | BuildKit disabled. `DOCKER_BUILDKIT=1 docker compose build`, or delete the two `--mount` lines. |

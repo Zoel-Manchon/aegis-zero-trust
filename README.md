@@ -206,9 +206,13 @@ the local Caddy origin `https://localhost`, which is what WEBAUTHN_RP_ORIGIN dec
 A passkey only works on its registered origin, so use exactly
 **https://localhost** — that is the value `WEBAUTHN_RP_ORIGIN` declares. Caddy
 serves it over TLS with its own internal CA, so the ceremony runs in a real
-secure context rather than relying on the `localhost` exemption. Trust the CA
-once with `docker compose exec web caddy trust`, or just accept the browser
-warning. If you don't have a fingerprint reader or hardware key, a **virtual
+secure context rather than relying on the `localhost` exemption. Trust that CA
+once — export it and import it into the browser, as
+[DOCKER.md](./DOCKER.md#trusting-caddys-certificate) sets out; `caddy trust`
+inside the container installs it where your browser will not look. Note that
+`docker compose down -v` destroys the CA and the browser then reports
+`SEC_ERROR_BAD_SIGNATURE` until the stale authority is removed and the new root
+imported. If you don't have a fingerprint reader or hardware key, a **virtual
 authenticator** completes the exact same flow.
 
 **Chrome / Edge (simplest — built-in, no extension):**
