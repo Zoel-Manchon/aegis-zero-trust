@@ -1,5 +1,13 @@
 # Aegis
 
+![Rust](https://img.shields.io/badge/Rust-CE422B?style=flat-square&logo=rust&logoColor=white)
+![Axum](https://img.shields.io/badge/Axum-000000?style=flat-square)
+![React](https://img.shields.io/badge/React-61DAFB?style=flat-square&logo=react&logoColor=black)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-DC382D?style=flat-square&logo=redis&logoColor=white)
+![WebAuthn passkeys](https://img.shields.io/badge/WebAuthn-passkeys-1F2A37?style=flat-square)
+![license MIT](https://img.shields.io/badge/license-MIT-2A3340?style=flat-square)
+
 **Zero-trust auth lab and attack range.**
 
 Every request is re-verified, scored for risk, and written to a tamper-evident
